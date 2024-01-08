@@ -1,0 +1,32 @@
+{
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "C_Cpp.intelliSenseEngine": "disabled",
+        "editor.formatOnSave": true,
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/bower_components": true,
+            "**/*.code-search": true,
+            ".vscode/": true,
+            // "build/": true,
+        },
+        "[cpp]": {
+            "files.encoding": "utf8bom",
+        },
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "c Attach",
+                "type": "cppvsdbg",
+                "processId": "${command:pickProcess}",
+                "request": "attach"
+            }
+        ]
+    }
+}

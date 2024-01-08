@@ -1,0 +1,25 @@
+add_requires("doctest")
+
+rule("TestRule")
+    on_load(function (target) 
+        target:add("rules","CommonRule")
+        target:add("deps", "Common")
+        target:add("packages", "doctest")
+        target:add("includedirs", "$(projectdir)/Src")
+    end)
+rule_end()
+
+target("TestLog")
+    set_kind("binary")
+    add_rules("TestRule")
+    add_files("TestLog.cpp")
+
+target("TestUtil")
+    set_kind("binary")
+    add_rules("TestRule")
+    add_files("TestUtil.cpp")
+
+target("TestTimeUtil")
+    set_kind("binary")
+    add_rules("TestRule")
+    add_files("TestTimeUtil.cpp")

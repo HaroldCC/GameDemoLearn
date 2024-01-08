@@ -1,0 +1,31 @@
+rule("3rdPartyRule")
+    on_load(function (target) 
+        target:set("targetdir", target:targetdir().."/3rdParty")
+    end)
+rule_end()
+
+target("asio")
+    set_kind("static")
+    add_rules("3rdPartyRule")
+    set_group("3rdParty")
+    add_headerfiles("./asio/asio/include/*.hpp", {prefixdir = "asio"})
+    add_defines("ASIO_SEPARATE_COMPILATION")
+    add_includedirs("asio/asio/include", {public = true})
+    add_files("asio/asio/src/asio.cpp")
+
+    before_build(function (target) 
+        if target:is_plat("windows") then
+            target:add("defines", "_WIN32_WINDOWS", "_WINSOCK_DEPRECATED_NO_WARNINGS")
+        end
+    end)
+target_end()
+
+target("spdlog")
+    set_kind("headeronly")
+    add_rules("3rdPartyRule")
+    set_group("3rdParty")
+    add_headerfiles("spdlog/include/spdlog/**.h", {prefixdir="spdlog"})
+    add_includedirs("spdlog/include", {public = true})
+    add_defines("SPDLOG_COMPILED_LIB")
+    add_files("spdlog/src/*.cpp")
+target_end()
