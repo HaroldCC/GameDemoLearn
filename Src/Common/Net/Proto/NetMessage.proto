@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package NetMessage;
+
+// 消息
+message Message
+{
+    fixed32 header  = 1; // 消息头
+    bytes   content = 2; // 消息体
+}

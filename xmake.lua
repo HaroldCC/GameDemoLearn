@@ -6,8 +6,6 @@ add_rules("mode.release", "mode.debug")
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("plugin.compile_commands.autoupdate", {outputdir="$(projectdir)/.vscode", lsp="cland"})
 
--- add_requires("protobuf-cpp", "swig")
-
 rule("CommonRule")
     on_load(function (target) 
         if is_mode("debug") then
