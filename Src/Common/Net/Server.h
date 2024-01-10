@@ -22,7 +22,7 @@ namespace Net
 
         IServer(asio::io_context &ioCtx, uint16_t port);
 
-        virtual ~IServer() = default;
+        virtual ~IServer();
 
         void Start();
 

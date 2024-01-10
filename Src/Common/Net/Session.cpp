@@ -9,11 +9,13 @@
 #include "Session.h"
 #include "Common/Util/Log.h"
 
+// #include "NetMessage.pb.h"
+
 namespace Net
 {
     ISession::ISession(asio::ip::tcp::socket &&socket)
         : _socket(std::move(socket))
-        , _remoteAddress(socket.remote_endpoint().address())
+        , _remoteAddress(_socket.remote_endpoint().address())
         , _remotePort(_socket.remote_endpoint().port())
         , _closed(false)
         , _closing(false)
@@ -38,6 +40,23 @@ namespace Net
 
     void ISession::SendProtoMessage(size_t header, const std::string &message)
     {
+        // NetMessage::Message send;
+        // send.set_header(static_cast<uint32_t>(header));
+        // Log::Debug("header = {}", header);
+        // send.set_content(message);
+        // MessageBuffer content(send.ByteSizeLong());
+        // if (send.SerializeToArray(content.GetWritPointer(), (int)content.WritableBytes()))
+        // {
+        //     content.WriteDone(send.ByteSizeLong());
+        //     Log::Debug("send len:{}", content.ReadableBytes());
+        //     _writeBufferQueue.push(std::move(content));
+
+        //     AsyncWrite();
+        // }
+        // else
+        // {
+        //     Log::Error("发送消息出错：【header:{}, content:{}】", header, message);
+        // }
     }
 
     void ISession::SendMsg(const MessageBuffer &message)

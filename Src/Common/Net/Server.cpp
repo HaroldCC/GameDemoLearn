@@ -14,9 +14,17 @@ namespace Net
 {
     IServer::IServer(asio::io_context &ioCtx, uint16_t port)
         : _ioCtx(ioCtx)
-        , _acceptor(_ioCtx, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
+        , _acceptor(ioCtx, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port))
         , _updateTimer(_ioCtx)
     {
+    }
+
+    IServer::~IServer()
+    {
+        if (_netThread.joinable())
+        {
+            _netThread.join();
+        }
     }
 
     void IServer::Start()
@@ -49,6 +57,8 @@ namespace Net
 
     void IServer::Update()
     {
+        using namespace std::chrono_literals;
+        _updateTimer.expires_from_now(1ms);
         _updateTimer.async_wait([this](const std::error_code &errcode) {
             Update();
         });

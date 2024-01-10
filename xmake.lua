@@ -25,6 +25,8 @@ rule("CommonRule")
     end)
 rule_end()
 
-includes("Src")
-includes("Tests")
 includes("3rdParty")
+includes("Src/Common")
+includes("Src/Servers")
+
+includes("Tests")

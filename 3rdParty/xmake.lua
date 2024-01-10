@@ -21,7 +21,7 @@ target("asio")
 target_end()
 
 target("spdlog")
-    set_kind("headeronly")
+    set_kind("static")
     add_rules("3rdPartyRule")
     set_group("3rdParty")
     add_headerfiles("spdlog/include/spdlog/**.h", {prefixdir="spdlog"})
@@ -30,8 +30,15 @@ target("spdlog")
     add_files("spdlog/src/*.cpp")
 target_end()
 
+target("magic_enum")
+    set_kind("headeronly")
+    add_rules("3rdPartyRule")
+    add_headerfiles("magic_enum/include/magic_enum/*.hpp", {prefixdir="magic_enum"})
+    add_includedirs("magic_enum/include", {public = true})
+target_end()
+
 package("protobuf")
-    add_deps("cmake")
+    add_deps("cmake", "zlib")
     set_policy("package.install_locally", true)
     -- set_policy("package.install_always", true)
 
@@ -56,7 +63,7 @@ package("protobuf")
 
     on_install("windows", "linux", function (package)
         -- os.cd("cmake")
-        io.replace("CMakeLists.txt", "set(protobuf_DEBUG_POSTFIX \"d\"", "set(protobuf_DEBUG_POSTFIX \"d\"", {plain = true})
+        io.replace("CMakeLists.txt", "set(protobuf_DEBUG_POSTFIX \"d\"", "set(protobuf_DEBUG_POSTFIX \"\"", {plain = true})
         local configs = {"-Dprotobuf_BUILD_TESTS=OFF", "-Dprotobuf_BUILD_PROTOC_BINARIES=ON"}
         table.insert(configs, "-DBUILD_SHARED_LIBS=" .. (package:config("shared") and "ON" or "OFF"))
         if package:is_plat("windows") then

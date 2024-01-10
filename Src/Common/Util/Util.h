@@ -40,6 +40,16 @@ namespace Util
         virtual ~Singleton() = default;
     };
 
+#if defined(__cpp_lib_to_underlying)
+    using ToUnderlying = std::to_underlying;
+#else
+    template <typename Enum>
+    inline constexpr std::underlying_type_t<Enum> ToUnderlying(Enum eum) noexcept
+    {
+        return static_cast<std::underlying_type_t<Enum>>(eum);
+    }
+#endif
+
     inline bool StringEqual(std::string_view strLeft, std::string_view strRight)
     {
         return std::equal(strLeft.begin(),
