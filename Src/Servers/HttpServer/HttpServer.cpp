@@ -10,6 +10,7 @@
 #include "Common/Net/Http/HttpCommon.h"
 #include "Common/Util/Log.h"
 #include "Common/Util/Assert.h"
+#include "Common/Database/DatabaseImpl/LoginDatabase.h"
 
 void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSession)
 {
@@ -24,6 +25,51 @@ void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSessi
                             resp.SetContent(body);
                             return;
                         });
+    pSession->AddRouter(
+        Http::HttpMethod::Get,
+        "/user",
+        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) {
+            auto data =
+                Database::g_LoginDatabaseStmts.find(Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
+            if (data == Database::g_LoginDatabaseStmts.end())
+            {
+                resp.SetStatusCode(Http::StatusCode::InternalServerError);
+                return;
+            }
+
+            Database::PreparedStatementBase *pStmt = Database::g_LoginDatabase.GetPrepareStatement(
+                Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
+            pStmt->SerialValue(data->second, "123456@qq.com");
+
+            //Database::PreparedQueryResultSetPtr pResult = Database::g_LoginDatabase.SyncQuery(pStmt);
+            _queryCallbackProcessor.AddCallback(Database::g_LoginDatabase.AsyncQuery(pStmt).Then(
+                [&resp](Database::PreparedQueryResultSetPtr pResult) {
+                    if (nullptr == pResult)
+                    {
+                        resp.SetStatusCode(Http::StatusCode::InternalServerError);
+                        return;
+                    }
+
+                    Database::Field *pFields = pResult->Fetch();
+                    uint32_t         id      = pFields[0];
+                    const char      *strName = pFields[1];
+                    const char      *email   = pFields[2];
+                    uint32_t         age     = pFields[3];
+                    std::string      intro   = pFields[4];
+
+                    resp.SetContent(std::format("id:{}, email:{}, name:{}, age:{}, intro:{}",
+                                                id,
+                                                email,
+                                                strName,
+                                                age,
+                                                intro));
+                    Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
+
+                    resp.SetStatusCode(Http::StatusCode::Ok);
+                }));
+
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+        });
 }
 
 void HttpServer::DoAccept()
@@ -42,4 +88,9 @@ void HttpServer::DoAccept()
 
         DoAccept();
     });
+}
+
+void HttpServer::Update()
+{
+    _queryCallbackProcessor.ProcessReadyCallbacks();
 }

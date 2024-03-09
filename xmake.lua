@@ -5,11 +5,18 @@ set_targetdir("Bin/$(plat)-$(arch)-$(mode)")
 add_rules("mode.release", "mode.debug")
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("plugin.compile_commands.autoupdate", {outputdir="$(projectdir)/.vscode", lsp="cland"})
+set_exceptions("cxx")
+
+if is_plat("windows") then
+    before_build(function (target) 
+        target:add("defines", "_WIN32_WINDOWS", "_WINSOCK_DEPRECATED_NO_WARNINGS")
+    end)
+end
 
 rule("CommonRule")
     on_load(function (target) 
         if is_mode("debug") then
-            target:add("defines", "DEBUG", "PERFORMANCE_DECT")
+            target:add("defines", "DEBUG", "ENABLE_PERFORMANCE_DECT")
             target:set("suffixname", "_d")
             target:set("symbols", "debug")
             target:set("optimize", "none")

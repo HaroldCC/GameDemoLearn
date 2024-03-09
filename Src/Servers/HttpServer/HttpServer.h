@@ -8,8 +8,9 @@
 ************************************************************************/
 #pragma once
 
-#include "Common/Net/Server.h"
 #include "HttpSession.h"
+#include "Common/Net/Server.h"
+#include "Common/Database/QueryCallback.h"
 
 class HttpServer final : public Net::IServer
 {
@@ -20,4 +21,9 @@ public:
 
 protected:
     void DoAccept() override;
+
+    void Update() override;
+
+private:
+    Database::QueryCallbackProcessor _queryCallbackProcessor;
 };
