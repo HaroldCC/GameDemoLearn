@@ -1,4 +1,7 @@
 set_languages("c++20")
+set_exceptions("cxx")
+set_warnings("all")
+set_defaultmode("debug")
 
 set_targetdir("Bin/$(plat)-$(arch)-$(mode)")
 
@@ -14,8 +17,6 @@ rule("CommonRule")
             target:set("symbols", "debug")
             target:set("optimize", "none")
         end
-
-        target:set("warnings", "all", "error")
 
         if target:is_plat("windows") then
             target:add("defines", "WIN32", "WIN32_LEAN_AND_MEAN")

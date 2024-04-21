@@ -1,4 +1,4 @@
-add_requires("protobuf")
+add_requires("protobuf-cpp")
 
 target("Common")
     set_kind("static")
@@ -8,6 +8,6 @@ target("Common")
     add_rules("CommonRule", "protobuf.cpp")
     add_deps("asio", "spdlog", "magic_enum")
 
-    add_packages("protobuf")
+    add_packages("protobuf-cpp")
 
     add_includedirs("$(projectdir)/Src", {public = true})
