@@ -27,3 +27,8 @@ target("TestBuffer")
     set_kind("binary")
     add_rules("TestRule", "CommonRule")
     add_files("TestBuffer.cpp")
+
+target("TestCoroutine")
+    set_kind("binary")
+    add_rules("TestRule", "CommonRule")
+    add_files("TestCoroutine.cpp")

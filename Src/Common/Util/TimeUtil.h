@@ -38,12 +38,13 @@ namespace TimeUtil
         {
             if (_logOnDestroy)
             {
-                Log::Debug({"{} 耗时:{} ms",
-                            Log::SourceLocation(_sourceLoc.file_name(),
-                                                _sourceLoc.function_name(),
-                                                _sourceLoc.line())},
+                Log::Debug("{} 耗时：{} ms -> [{} {} {}:{}]",
                            _msg,
-                           ElapsedMillisec());
+                           ElapsedMillisec(),
+                           _sourceLoc.file_name(),
+                           _sourceLoc.function_name(),
+                           _sourceLoc.line(),
+                           _sourceLoc.column());
             };
         }
 

@@ -1,4 +1,4 @@
-set_languages("c++20")
+set_languages("c++23")
 set_exceptions("cxx")
 set_warnings("all")
 set_defaultmode("debug")
@@ -13,9 +13,9 @@ rule("CommonRule")
     on_load(function (target) 
         if is_mode("debug") then
             target:add("defines", "DEBUG", "PERFORMANCE_DECT")
-            target:set("suffixname", "_d")
-            target:set("symbols", "debug")
-            target:set("optimize", "none")
+            -- target:set("suffixname", "_d")
+            -- target:set("symbols", "debug")
+            -- target:set("optimize", "none")
         end
 
         if target:is_plat("windows") then

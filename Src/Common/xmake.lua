@@ -6,7 +6,7 @@ target("Common")
     add_files("**.cpp", "**.c", "Net/Proto/*.proto")
 
     add_rules("CommonRule", "protobuf.cpp")
-    add_deps("asio", "spdlog", "magic_enum")
+    add_deps("asio", "spdlog", "magic_enum", "async_simple", {public=true})
 
     add_packages("protobuf-cpp")
 

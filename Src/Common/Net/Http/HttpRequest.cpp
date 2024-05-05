@@ -29,7 +29,7 @@ namespace Http
         size_t headerLen = _parser.ParseRequest(content);
         if (headerLen == 0)
         {
-            Log::Error("Parser http request error");
+            Log::Error("{}", "Parser http request error");
             return StatusCode::InternalServerError;
         }
 
