@@ -79,6 +79,12 @@ namespace Database
 
     void IMySqlConnection::Close()
     {
+        if (nullptr != _ioCtxWork)
+        {
+            _ioCtxWork->get_io_context().stop();
+            _ioCtxWork.reset();
+        }
+
         if (_pWorkerThread->joinable())
         {
             _pWorkerThread->join();
@@ -204,6 +210,25 @@ namespace Database
         return MakeQueryResultSetPtr(pResult, pFields, rowCount, fieldCount);
     }
 
+    asio::awaitable<QueryResultSetPtr> IMySqlConnection::CoQuery(std::string_view sql)
+    {
+        if (sql.empty())
+        {
+            co_return nullptr;
+        }
+
+        MySqlResult *pResult    = nullptr;
+        MySqlField  *pFields    = nullptr;
+        uint64_t     rowCount   = 0;
+        uint32_t     fieldCount = 0;
+        if (!Query(sql, pResult, pFields, rowCount, fieldCount))
+        {
+            co_return nullptr;
+        }
+
+        co_return MakeQueryResultSetPtr(pResult, pFields, rowCount, fieldCount);
+    }
+
     PreparedQueryResultSetPtr IMySqlConnection::Query(PreparedStatementBase *pStmt)
     {
         MySqlPreparedStatement *pPreparedStmt = nullptr;
@@ -243,12 +268,20 @@ namespace Database
         mysql_ping(_pMysqlHandle);
     }
 
-    void IMySqlConnection::StartWorkerThread(asio::io_context *pIoCtx)
+    void IMySqlConnection::StartWorkerThread()
     {
-        _pWorkerThread = std::make_unique<std::thread>([pIoCtx] {
-            asio::executor_work_guard<asio::io_context::executor_type> executorWorkGuard = 
-            asio::make_work_guard(pIoCtx->get_executor());
-            pIoCtx->run();
+        // auto wg        = asio::make_work_guard(pIoCtx);
+        _ioCtx         = std::make_unique<asio::io_context>(1);
+        _ioCtxWork     = std::make_unique<asio::io_context::work>(*_ioCtx);
+        _pWorkerThread = std::make_unique<std::thread>([this] {
+            try
+            {
+                _ioCtx->run();
+            }
+            catch (std::exception &e)
+            {
+                Log::Error("数据库线程发生异常:{}", e.what());
+            }
         });
     }
 

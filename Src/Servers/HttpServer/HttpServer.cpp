@@ -28,7 +28,7 @@ void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSessi
     pSession->AddRouter(
         Http::HttpMethod::Get,
         "/user",
-        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) {
+        [](const Http::HttpRequest &request, Http::HttpResponse &resp) {
             auto data =
                 Database::g_LoginDatabaseStmts.find(Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
             if (data == Database::g_LoginDatabaseStmts.end())
@@ -36,15 +36,12 @@ void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSessi
                 resp.SetStatusCode(Http::StatusCode::InternalServerError);
                 return;
             }
+            Log::Debug("/user request");
 
-            Database::PreparedStatementBase *pStmt = Database::g_LoginDatabase.GetPrepareStatement(
-                Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
-            pStmt->SerialValue(data->second, "123456@qq.com");
-
-            //Database::PreparedQueryResultSetPtr pResult = Database::g_LoginDatabase.SyncQuery(pStmt);
-            _queryCallbackProcessor.AddCallback(Database::g_LoginDatabase.AsyncQuery(pStmt).Then(
-                [&resp](Database::PreparedQueryResultSetPtr pResult) {
-                    if (nullptr == pResult)
+            Database::g_LoginDatabase.CoQuery(
+                "select id, name, email, age, intro from account where email=123456@qq.com",
+                [&resp](Database::QueryResultSetPtr pResult) {
+                    if (pResult == nullptr)
                     {
                         resp.SetStatusCode(Http::StatusCode::InternalServerError);
                         return;
@@ -66,31 +63,66 @@ void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSessi
                     Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
 
                     resp.SetStatusCode(Http::StatusCode::Ok);
-                }));
+                });
 
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            Log::Debug("-------------------------------");
+            // std::this_thread::sleep_for(std::chrono::seconds(10));
+
+            // Database::PreparedStatementBase *pStmt = Database::g_LoginDatabase.GetPrepareStatement(
+            //     Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
+            // pStmt->SerialValue(data->second, "123456@qq.com");
+
+            // //Database::PreparedQueryResultSetPtr pResult = Database::g_LoginDatabase.SyncQuery(pStmt);
+            // _queryCallbackProcessor.AddCallback(Database::g_LoginDatabase.AsyncQuery(pStmt).Then(
+            //     [&resp](Database::PreparedQueryResultSetPtr pResult) {
+            //         if (nullptr == pResult)
+            //         {
+            //             resp.SetStatusCode(Http::StatusCode::InternalServerError);
+            //             return;
+            //         }
+
+            //         Database::Field *pFields = pResult->Fetch();
+            //         uint32_t         id      = pFields[0];
+            //         const char      *strName = pFields[1];
+            //         const char      *email   = pFields[2];
+            //         uint32_t         age     = pFields[3];
+            //         std::string      intro   = pFields[4];
+
+            //         resp.SetContent(std::format("id:{}, email:{}, name:{}, age:{}, intro:{}",
+            //                                     id,
+            //                                     email,
+            //                                     strName,
+            //                                     age,
+            //                                     intro));
+            //         Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
+
+            //         resp.SetStatusCode(Http::StatusCode::Ok);
+            //     }));
+
+            // std::this_thread::sleep_for(std::chrono::seconds(5));
         });
 }
 
-void HttpServer::DoAccept()
+asio::awaitable<void> HttpServer::AcceptLoop()
 {
-    _acceptor.async_accept([this](const std::error_code &errcode, asio::ip::tcp::socket socket) {
+    while (true)
+    {
+        auto [errcode, socket] = co_await _acceptor.async_accept();
         if (errcode)
         {
             Log::Error("接受连接失败：{}", errcode.message());
-            return;
+            co_return;
         }
 
-        auto pSession = std::make_shared<Http::HttpSession>(std::move(socket));
+        auto            pSession = std::make_shared<Http::HttpSession>(std::move(socket));
+        std::lock_guard lock(_mutex);
         _sessions.emplace_back(pSession);
         InitHttpRouter(pSession);
         pSession->StartSession();
-
-        DoAccept();
-    });
+    }
 }
 
 void HttpServer::Update()
 {
-    _queryCallbackProcessor.ProcessReadyCallbacks();
+    Net::IServer::Update();
 }

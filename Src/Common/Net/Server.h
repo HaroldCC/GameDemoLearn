@@ -7,12 +7,11 @@
 > Created Time    : 2024年01月08日  17时12分04秒
 ************************************************************************/
 #pragma once
-#include "Common/Util/Platform.h"
-#include "asio.hpp"
+#include "Asio.h"
 
 namespace Net
 {
-    class IServer
+    class IServer : public std::enable_shared_from_this<IServer>
     {
     public:
         IServer(const IServer &)            = delete;
@@ -20,7 +19,7 @@ namespace Net
         IServer &operator=(const IServer &) = delete;
         IServer &operator=(IServer &&)      = delete;
 
-        IServer(asio::io_context &ioCtx, uint16_t port);
+        IServer(std::string_view ip, uint16_t port);
 
         virtual ~IServer();
 
@@ -29,13 +28,17 @@ namespace Net
     protected:
         virtual void Update();
 
-        virtual void DoAccept() = 0;
+        virtual asio::awaitable<void> AcceptLoop() = 0;
 
     protected:
-        std::thread                                  _netThread;
-        asio::io_context                            &_ioCtx;
-        asio::ip::tcp::acceptor                      _acceptor;
-        asio::steady_timer                           _updateTimer;
+        std::thread                                  _logicThread;
+        std::mutex                                   _mutex;
+        Asio::io_context                             _ioCtx;
+        Asio::io_context                             _logicCtx;
+        Asio::signal_set                             _signals;
+        Asio::endpoint                               _listenEndPoint;
+        Asio::acceptor                               _acceptor;
+        Asio::steady_timer                           _updateTimer;
         std::vector<std::shared_ptr<class ISession>> _sessions;
     };
 } // namespace Net

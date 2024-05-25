@@ -35,7 +35,8 @@ namespace Net
 
     void ISession::StartSession()
     {
-        AsyncRead();
+        asio::co_spawn(_socket.get_executor(), ReadLoop(), asio::detached);
+        asio::co_spawn(_socket.get_executor(), WriteLoop(), asio::detached);
     }
 
     void ISession::SendProtoMessage(size_t header, const std::string &message)
@@ -66,8 +67,8 @@ namespace Net
             return;
         }
 
-        _writeBufferQueue.push(message);
-        AsyncWrite();
+        _writeBufferQueue.Push(message);
+        // AsyncWrite();
     }
 
     void ISession::CloseSession()
@@ -88,67 +89,121 @@ namespace Net
         }
     }
 
-    void ISession::AsyncRead()
+    asio::awaitable<void> ISession::ReadLoop()
     {
-        auto self(shared_from_this());
-        _readBuffer.EnsureFreeSpace();
-        _socket.async_read_some(asio::buffer(_readBuffer.GetWritPointer(), _readBuffer.WritableBytes()),
-                                [this, self](const std::error_code &errcode, size_t length) {
-                                    if (errcode)
-                                    {
-                                        if (errcode != asio::error::eof)
-                                        {
-                                            Log::Error("读取消息出错：{}", errcode.message());
-                                        }
-
-                                        CloseSession();
-                                        return;
-                                    }
-
-                                    // 更新写入数据量
-                                    _readBuffer.WriteDone(length);
-
-                                    ReadHandler();
-
-                                    AsyncRead();
-                                });
-    }
-
-    void ISession::AsyncWrite()
-    {
-        if (_writeBufferQueue.empty())
+        while (true)
         {
-            return;
+            Log::Debug("readLoop");
+            auto [errcode, length] = co_await _socket.async_read_some(
+                asio::buffer(_buffer.GetWritPointer(), _buffer.WritableBytes()));
+
+            Log::Debug("after readLoop:{}", length);
+            if (errcode)
+            {
+                if (errcode != asio::error::eof)
+                {
+                    Log::Error("读取消息出错：{}", errcode.message());
+                }
+
+                Log::Error("读取消息出错：{}", errcode.message());
+                CloseSession();
+                co_return;
+            }
+
+            _buffer.WriteDone(length);
+            _readBufferQueue.Push(std::move(_buffer));
         }
 
-        auto           self(shared_from_this());
-        MessageBuffer &packet = _writeBufferQueue.front();
-        _socket.async_write_some(asio::buffer(packet.GetReadPointer(), packet.ReadableBytes()),
-                                 [this, self](const std::error_code &errcode, std::size_t length) {
-                                     if (errcode)
-                                     {
-                                         CloseSession();
-                                         Log::Error("发送消息失败：{}", errcode.message());
-                                         return;
-                                     }
+        // auto self(shared_from_this());
+        // _socket.async_read_some(asio::buffer(_buffer.GetWritPointer(), _buffer.WritableBytes()),
+        //                         [self](const std::error_code &errcode, size_t length) mutable {
+        //                             if (errcode)
+        //                             {
+        //                                 if (errcode != asio::error::eof)
+        //                                 {
+        //                                     Log::Error("读取消息出错：{}", errcode.message());
+        //                                 }
 
-                                     // 更新从buff读出来多少数据
-                                     auto &&buff = _writeBufferQueue.front();
-                                     buff.ReadDone(length);
+        //                                 self->CloseSession();
+        //                                 return;
+        //                             }
 
-                                     if (buff.ReadableBytes() == 0)
-                                     {
-                                         _writeBufferQueue.pop();
-                                     }
+        //                             // if (length == 0)
+        //                             // {
+        //                             //     Log::Warn("读取数据长度为0");
+        //                             //     return;
+        //                             // }
 
-                                     if (!_writeBufferQueue.empty())
-                                     {
-                                         AsyncWrite();
-                                     }
-                                     else if (_closing)
-                                     {
-                                         CloseSession();
-                                     }
-                                 });
+        //                             Log::Debug("async Read:{}", length);
+
+        //                             // 更新写入数据量
+        //                             self->_buffer.WriteDone(length);
+
+        //                             self->_readBufferQueue.Push(std::move(self->_buffer));
+
+        //                             self->AsyncRead();
+        //                         });
+    }
+
+    asio::awaitable<void> ISession::WriteLoop()
+    {
+        while (true)
+        {
+            if (_writeBufferQueue.Empty())
+            {
+                continue;
+            }
+
+            MessageBuffer packet;
+            if (!_writeBufferQueue.Pop(packet))
+            {
+                continue;
+            }
+
+            auto [errcode, length] =
+                co_await asio::async_write(_socket,
+                                           asio::buffer(packet.GetReadPointer(), packet.ReadableBytes()));
+            if (errcode)
+            {
+                CloseSession();
+                Log::Error("发送消息失败：{}", errcode.message());
+                co_return;
+            }
+        }
+
+        // MessageBuffer packet;
+        // if (!_writeBufferQueue.Pop(packet))
+        // {
+        //     co_return;
+        // }
+
+        // auto self(shared_from_this());
+        // asio::async_write(_socket,
+        //                   asio::buffer(packet.GetReadPointer(), packet.ReadableBytes()),
+        //                   [self](const std::error_code &errcode, std::size_t length) mutable {
+        //                       if (errcode)
+        //                       {
+        //                           self->CloseSession();
+        //                           Log::Error("发送消息失败：{}", errcode.message());
+        //                           return;
+        //                       }
+
+        //                       Log::Debug("Write done:{} currend thread:{}", length);
+        //                       // packet.ReadDone(length);
+
+        //                       // if (packet.ReadableBytes() != 0)
+        //                       // {
+        //                       //     Log::Warn("packet的消息未读处理完就抛弃！！！");
+        //                       // }
+
+        //                       if (!self->_writeBufferQueue.Empty())
+        //                       {
+        //                           self->AsyncWrite();
+        //                       }
+        //                       else if (self->_closing)
+        //                       {
+        //                           self->CloseSession();
+        //                       }
+        //                   });
     }
 } // namespace Net

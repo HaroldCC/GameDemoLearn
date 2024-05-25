@@ -19,7 +19,12 @@ namespace Http
 
     void HttpSession::ReadHandler()
     {
-        Net::MessageBuffer &packet = GetReadBuffer();
+        Net::MessageBuffer packet;
+        if (!_readBufferQueue.Pop(packet))
+        {
+            return;
+        }
+
         if (packet.ReadableBytes() <= 0)
         {
             return;
@@ -28,14 +33,14 @@ namespace Http
         const std::string &content = packet.ReadAllAsString();
         if (!content.empty())
         {
-            Log::Info("Http:{}", content);
+            // Log::Info("Http:{}", content);
             _req.Parse(content);
             _router.Route(_req, _rep);
 
             std::string_view   response = _rep.GetPayload();
             Net::MessageBuffer sendBuffer(response.size());
             sendBuffer.Write(response);
-            SendMsg(sendBuffer);
+            SendMsg(std::move(sendBuffer));
             // SendProtoMessage((uint32_t)response.size(), response.data());
         }
         else

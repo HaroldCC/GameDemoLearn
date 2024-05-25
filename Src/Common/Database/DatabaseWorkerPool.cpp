@@ -37,7 +37,7 @@ namespace Database
                   _syncThreadCount,
                   _asyncThreadCount);
 
-        _ioContext = std::make_unique<asio::io_context>(_asyncThreadCount);
+        // _ioContext = std::make_unique<asio::io_context>(_asyncThreadCount);
 
         uint32_t errcode = OpenConnections(EConnectionTypeIndex_Async, _asyncThreadCount);
         if (0 != errcode)
@@ -53,7 +53,12 @@ namespace Database
 
         for (const auto &pConnection : _typeConnections[EConnectionTypeIndex_Async])
         {
-            pConnection->StartWorkerThread(_ioContext.get());
+            // std::unique_ptr<asio::io_context>       pIoCtx = std::make_unique<asio::io_context>();
+            // std::unique_ptr<asio::io_context::work> pIoCtxWork =
+            //     std::make_unique<asio::io_context::work>(*pIoCtx);
+            pConnection->StartWorkerThread();
+            // _ioContexts.emplace_back(std::move(pIoCtx));
+            // _ioCtxWorks.emplace_back(std::move(pIoCtxWork));
         }
 
         Log::Info("数据库工作池连接成功：{} 当前连接数：{}",
@@ -68,12 +73,18 @@ namespace Database
     {
         Log::Info("关闭数据库工作池：{}", _pConnectionInfo->database);
 
-        _ioContext->stop();
+        // _ioContext->stop();
 
         _typeConnections[EConnectionTypeIndex_Async].clear();
-        _ioContext->reset();
+        // _ioContext->reset();
 
         _typeConnections[EConnectionTypeIndex_Sync].clear();
+
+        // for (auto &&pWork : _ioCtxWorks)
+        // {
+        //     pWork->get_io_context().stop();
+        //     pWork.reset();
+        // }
     }
 
     template <typename ConnectionType>
@@ -127,18 +138,18 @@ namespace Database
             return;
         }
 
-        asio::post(_ioContext->get_executor(), [this, sql] {
-            for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-            {
-                if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-                {
-                    return pConnection->Execute(sql);
-                }
-            }
+        // asio::post(_ioContext->get_executor(), [this, sql] {
+        //     for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
+        //     {
+        //         if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
+        //         {
+        //             return pConnection->Execute(sql);
+        //         }
+        //     }
 
-            Log::Critical("执行sql语句:{}, 错误，找不到对应连接的工作线程", sql);
-            return false;
-        });
+        //     Log::Critical("执行sql语句:{}, 错误，找不到对应连接的工作线程", sql);
+        //     return false;
+        // });
     }
 
     template <typename ConnectionType>
@@ -149,18 +160,18 @@ namespace Database
             return;
         }
 
-        asio::post(_ioContext->get_executor(), [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)] {
-            for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-            {
-                if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-                {
-                    return pConnection->Execute(pStmt.get());
-                }
-            }
+        // asio::post(_ioContext->get_executor(), [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)] {
+        //     for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
+        //     {
+        //         if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
+        //         {
+        //             return pConnection->Execute(pStmt.get());
+        //         }
+        //     }
 
-            Log::Critical("执行预处理sql语句:{}, 错误，找不到对应连接的工作线程", pStmt->GetIndex());
-            return false;
-        });
+        //     Log::Critical("执行预处理sql语句:{}, 错误，找不到对应连接的工作线程", pStmt->GetIndex());
+        //     return false;
+        // });
     }
 
     template <typename ConnectionType>
@@ -192,43 +203,59 @@ namespace Database
     template <typename ConnectionType>
     QueryCallback DatabaseWorkerPool<ConnectionType>::AsyncQuery(std::string_view sql)
     {
-        QueryResultFuture result =
-            asio::post(_ioContext->get_executor(), asio::use_future([this, sql]() -> QueryResultSetPtr {
-                           for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-                           {
-                               if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-                               {
-                                   return pConnection->Query(sql);
-                               }
-                           }
+        // QueryResultFuture result =
+        //     asio::post(_ioContext->get_executor(), asio::use_future([this, sql]() -> QueryResultSetPtr {
+        //                    for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
+        //                    {
+        //                        if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
+        //                        {
+        //                            return pConnection->Query(sql);
+        //                        }
+        //                    }
 
-                           Log::Critical("执行sql语句:{}, 错误，找不到对应连接的工作线程", sql);
-                           return nullptr;
-                       }));
+        //                    Log::Critical("执行sql语句:{}, 错误，找不到对应连接的工作线程", sql);
+        //                    return nullptr;
+        //                }));
 
-        return QueryCallback(std::move(result));
+        // return QueryCallback(std::move(result));
+        return QueryCallback(QueryResultFuture());
     }
 
     template <typename ConnectionType>
     QueryCallback DatabaseWorkerPool<ConnectionType>::AsyncQuery(PreparedStatementBase *pStmt)
     {
-        PreparedQueryResultFuture result = asio::post(
-            _ioContext->get_executor(),
-            asio::use_future(
-                [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)]() -> PreparedQueryResultSetPtr {
-                    for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-                    {
-                        if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-                        {
-                            return pConnection->Query(pStmt.get());
-                        }
-                    }
+        // PreparedQueryResultFuture result = asio::post(
+        //     _ioContext->get_executor(),
+        //     asio::use_future(
+        //         [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)]() -> PreparedQueryResultSetPtr {
+        //             for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
+        //             {
+        //                 if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
+        //                 {
+        //                     return pConnection->Query(pStmt.get());
+        //                 }
+        //             }
 
-                    Log::Critical("执行预处理sql语句:{}, 错误，找不到对应连接的工作线程", pStmt->GetIndex());
-                    return nullptr;
-                }));
+        //             Log::Critical("执行预处理sql语句:{}, 错误，找不到对应连接的工作线程", pStmt->GetIndex());
+        //             return nullptr;
+        //         }));
 
-        return QueryCallback(std::move(result));
+        // return QueryCallback(std::move(result));
+        return QueryCallback(QueryResultFuture());
+    }
+
+    template <typename ConnectionType>
+    void DatabaseWorkerPool<ConnectionType>::CoQuery(std::string_view                         sql,
+                                                     std::function<void(QueryResultSetPtr)> &&f)
+    {
+        auto pConnection = GetFreeConnectionAndLock();
+        pConnection->UnLock();
+        asio::co_spawn(pConnection->GetIoContext(),
+                       pConnection->CoQuery(sql),
+                       [](std::exception_ptr ex, QueryResultSetPtr pResult) {
+                           //    f(pResult);
+                           Log::Debug("result");
+                       });
     }
 
     template <typename ConnectionType>

@@ -10,10 +10,8 @@
 
 #include "Common/Util/Platform.h"
 #include "Buffer.h"
-#include "asio.hpp"
-
-#include <memory>
-#include <queue>
+#include "Asio.h"
+#include "Common/Util/ProducerConsumerQueue.hpp"
 
 namespace Net
 {
@@ -54,14 +52,10 @@ namespace Net
             _closing = true;
         }
 
-        MessageBuffer &GetReadBuffer()
-        {
-            return _readBuffer;
-        }
-
     protected:
         virtual bool Update()
         {
+            ReadHandler();
             return !_closed;
         }
 
@@ -95,17 +89,18 @@ namespace Net
             return message;
         }
 
-        void AsyncRead();
+        asio::awaitable<void> ReadLoop();
 
-        void AsyncWrite();
+        asio::awaitable<void> WriteLoop();
 
     protected:
-        asio::ip::tcp::socket     _socket;
-        asio::ip::address         _remoteAddress;
-        uint16_t                  _remotePort;
-        uint32_t                  _header {0};
-        MessageBuffer             _readBuffer;
-        std::queue<MessageBuffer> _writeBufferQueue;
+        Asio::socket                         _socket;
+        Asio::address                        _remoteAddress;
+        uint16_t                             _remotePort;
+        uint32_t                             _header {0};
+        MessageBuffer                        _buffer;
+        ProducerConsumerQueue<MessageBuffer> _readBufferQueue;
+        ProducerConsumerQueue<MessageBuffer> _writeBufferQueue;
 
         std::atomic_bool _closed;
         std::atomic_bool _closing;

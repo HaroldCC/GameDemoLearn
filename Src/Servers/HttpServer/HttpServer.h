@@ -20,7 +20,7 @@ public:
     void InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSession);
 
 protected:
-    void DoAccept() override;
+    asio::awaitable<void> AcceptLoop() override;
 
     void Update() override;
 

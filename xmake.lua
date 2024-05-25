@@ -17,15 +17,14 @@ rule("CommonRule")
     on_load(function (target) 
         if is_mode("debug") then
             target:add("defines", "DEBUG", "ENABLE_PERFORMANCE_DECT")
-            target:set("suffixname", "_d")
             target:set("symbols", "debug")
             target:set("optimize", "none")
         end
 
-        target:set("warnings", "all", "error")
+        target:set("warnings", "all")
 
         if target:is_plat("windows") then
-            target:add("defines", "WIN32", "WIN32_LEAN_AND_MEAN")
+            target:add("defines", "WIN32", "WIN32_LEAN_AND_MEAN", "ASIO_HAS_CO_AWAIT=1")
             target:add("cxxflags", "cl::/wd4819")
             target:add("defines", "_CRT_SECURE_NO_WARNINGS")
         end

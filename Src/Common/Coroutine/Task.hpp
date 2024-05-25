@@ -11,7 +11,9 @@
 #include <coroutine>
 #include <concepts>
 #include <exception>
+#include <semaphore>
 #include <variant>
+#include "Common/Util/Log.h"
 
 namespace Coroutine
 {
@@ -20,7 +22,7 @@ namespace Coroutine
     {
         class PromiseTypeBase
         {
-            struct FinalAwaiter
+            struct FinalAwaitable
             {
                 inline constexpr bool await_ready() const noexcept
                 {
@@ -30,7 +32,7 @@ namespace Coroutine
                 template <std::derived_from<PromiseTypeBase> PromiseType>
                 std::coroutine_handle<> await_suspend(std::coroutine_handle<PromiseType> coroutine) noexcept
                 {
-                    return coroutine.promise()._parendCoro;
+                    return coroutine.promise()._continueCoro;
                 }
 
                 inline constexpr void await_resume() noexcept
@@ -46,7 +48,7 @@ namespace Coroutine
                 return std::suspend_always {};
             }
 
-            inline constexpr FinalAwaiter final_suspend() noexcept
+            inline constexpr FinalAwaitable final_suspend() noexcept
             {
                 return {};
             }
@@ -78,7 +80,7 @@ namespace Coroutine
                 requires std::convertible_to<ValueType &&, T>
             void return_value(ValueType &&value) noexcept(std::is_nothrow_constructible_v<T, ValueType &&>)
             {
-                _result.template emplace(std::forward<ValueType>(value));
+                _result.template emplace<ValueType>(std::forward<ValueType>(value));
             }
 
             T &result() &
@@ -143,18 +145,18 @@ namespace Coroutine
         using promise_type = detail::PromiseType<T>;
         using value_type   = T;
 
-        Task(std::coroutine_handle<promise_type> coroutine = nullptr) noexcept : _cotoutine(coroutine)
+        Task(std::coroutine_handle<promise_type> coroutine = nullptr) noexcept : _coroutine(coroutine)
         {
         }
 
-        Task(Task &&right) noexcept : _cotoutine(right._cotoutine)
+        Task(Task &&right) noexcept : _coroutine(right._coroutine)
         {
-            right._cotoutine = nullptr;
+            right._coroutine = nullptr;
         }
 
         Task &operator=(Task &&right) noexcept
         {
-            std::swap(_cotoutine, right._cotoutine);
+            std::swap(_coroutine, right._coroutine);
             return *this;
         }
 
@@ -163,62 +165,122 @@ namespace Coroutine
 
         ~Task()
         {
-            if (_cotoutine != nullptr)
+            if (_coroutine != nullptr)
             {
-                _cotoutine.destroy();
+                _coroutine.destroy();
             }
         }
 
         bool IsReady() const noexcept
         {
-            return _cotoutine != nullptr || _cotoutine.done();
+            return _coroutine == nullptr || _coroutine.done();
         }
 
         std::coroutine_handle<promise_type> get() const noexcept
         {
-            return _cotoutine;
+            return _coroutine;
         }
 
         std::coroutine_handle<promise_type>
         reset(std::coroutine_handle<promise_type> cotoutine = nullptr) noexcept
         {
-            return std::exchange(_cotoutine, cotoutine);
+            return std::exchange(_coroutine, cotoutine);
+        }
+
+        auto operator co_await() const & noexcept
+        {
+            // return TaskAwaiter {_coroutine};
+            struct awaitable : TaskAwaiter
+            {
+                using TaskAwaiter::TaskAwaiter;
+
+                decltype(auto) await_resume()
+                {
+                    if (_coroutine == nullptr)
+                    {
+                        Log::Error("Broken Promise");
+                        throw std::logic_error("broken promise");
+                    }
+
+                    return _coroutine.promise().result();
+                }
+            };
+
+            return awaitable {_coroutine};
         }
 
         auto operator co_await() const && noexcept
         {
-            return TaskAwaiter {_cotoutine};
+            // return TaskAwaiter {_coroutine};
+            struct awaitable : TaskAwaiter
+            {
+                using TaskAwaiter::TaskAwaiter;
+
+                decltype(auto) await_resume()
+                {
+                    if (_coroutine == nullptr)
+                    {
+                        Log::Error("Broken Promise");
+                    }
+
+                    return std::move(_coroutine.promise().result());
+                }
+            };
+
+            return awaitable {_coroutine};
         }
 
     private:
         struct TaskAwaiter
         {
-            std::coroutine_handle<promise_type> _cotoutine;
+            std::coroutine_handle<promise_type> _coroutine;
 
-            TaskAwaiter(std::coroutine_handle<promise_type> coroutine) : _cotoutine(coroutine)
+            TaskAwaiter(std::coroutine_handle<promise_type> coroutine) : _coroutine(coroutine)
             {
             }
+
+            TaskAwaiter(TaskAwaiter &&awaiter) : _coroutine(std::exchange(awaiter._coroutine, nullptr))
+            {
+            }
+
+            // ~TaskAwaiter() noexcept
+            // {
+            //     if (nullptr != _coroutine && _coroutine.done()) [[unlikely]]
+            //     {
+            //         Log::Error("协程执行完但结果未获取");
+            //         _coroutine.promise().result();
+            //     }
+            // }
 
             bool await_ready() const noexcept
 
             {
-                return _cotoutine != nullptr || _cotoutine.done();
+                return _coroutine == nullptr || _coroutine.done();
             }
 
-            std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaitCoroutine) noexcept
+            std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaitCoroutine) const noexcept
             {
                 // 当前协程挂起的时候，记录挂起该协程的协程，作为continuation，使得当前协程执行完继续之前的协程
-                _cotoutine.promise().SetContinuation(awaitCoroutine);
-                return _cotoutine;
+                _coroutine.promise().SetContinuation(awaitCoroutine);
+                return _coroutine;
             }
 
             T await_resume()
             {
-                return _cotoutine.promise().result();
+                auto coroutine = _coroutine;
+                _coroutine     = nullptr;
+
+                return coroutine.promise().result();
             }
         };
 
-        std::coroutine_handle<promise_type> _cotoutine;
+        std::coroutine_handle<promise_type> _coroutine;
     };
+
+    template <typename TaskType>
+    auto SyncWait(TaskType &&task)
+    {
+        std::binary_semaphore cond(0);
+    }
 
 } // namespace Coroutine
