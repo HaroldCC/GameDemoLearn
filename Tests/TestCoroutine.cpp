@@ -15,6 +15,64 @@ using asio::detached;
 using asio::use_awaitable;
 using asio::ip::tcp;
 
+template <typename T>
+class ThreadSafeQueue
+{
+public:
+    ThreadSafeQueue() = default;
+
+    void push(const T &value)
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            queue_.push(value);
+        }
+        cond_.notify_one();
+    }
+
+    void push(T &&value)
+    {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            queue_.push(std::move(value));
+        }
+        cond_.notify_one();
+    }
+
+    bool try_pop(T &value)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (queue_.empty())
+        {
+            return false;
+        }
+        value = std::move(queue_.front());
+        queue_.pop();
+        return true;
+    }
+
+    void wait_and_pop(T &value)
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cond_.wait(lock, [this] {
+            return !queue_.empty();
+        });
+        value = std::move(queue_.front());
+        queue_.pop();
+    }
+
+    bool empty() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.empty();
+    }
+
+private:
+    mutable std::mutex      mutex_;
+    std::queue<T>           queue_;
+    std::condition_variable cond_;
+};
+
 class session : public std::enable_shared_from_this<session>
 {
 public:
@@ -41,11 +99,8 @@ public:
 
     void send(const std::string &msg)
     {
-        {
-            std::unique_lock lock(output_queue_mutex_);
-            output_queue_.push(msg);
-        }
-        timer_.cancel_one();
+        output_queue_.push(msg);
+        timer_.cancel();
     }
 
     void read(std::string &msg)
@@ -65,6 +120,7 @@ private:
         {
             for (std::string read_msg;;)
             {
+                std::cout << "reader wait" << std::endl;
                 std::size_t n = co_await asio::async_read_until(socket_,
                                                                 asio::dynamic_buffer(read_msg, 1024),
                                                                 "\n",
@@ -73,6 +129,7 @@ private:
                 {
                     std::unique_lock lock(input_queue_mutex_);
                     input_queue_.push(read_msg.substr(0, n));
+                    std::cout << "reader reacv msg：" << read_msg << std::endl;
                 }
                 read_msg.erase(0, n);
             }
@@ -90,20 +147,20 @@ private:
             while (socket_.is_open())
             {
                 std::string msg;
+                if (output_queue_.try_pop(msg))
                 {
-                    std::unique_lock lock(output_queue_mutex_);
-                    if (output_queue_.empty())
-                    {
-                        asio::error_code ec;
-                        co_await timer_.async_wait(asio::redirect_error(use_awaitable, ec));
-                        std::cout << "write queue empty:" << ec.message() << std::endl;
-                        continue;
-                    }
-                    msg = std::move(output_queue_.front());
-                    output_queue_.pop();
+                    // There's a message in the queue, send it
+                    std::cout << "writer send msg:" << msg << std::endl;
+                    co_await asio::async_write(socket_, asio::buffer(msg), use_awaitable);
                 }
-
-                co_await asio::async_write(socket_, asio::buffer(msg), use_awaitable);
+                else
+                {
+                    // No message, wait for notification or send to abort
+                    asio::error_code ec;
+                    std::cout << "writer empty" << std::endl;
+                    timer_.expires_after(std::chrono::hours(24));
+                    co_await timer_.async_wait(asio::redirect_error(use_awaitable, ec));
+                }
             }
         }
         catch (std::exception &)
@@ -118,12 +175,11 @@ private:
         timer_.cancel();
     }
 
-    tcp::socket             socket_;
-    asio::steady_timer      timer_;
-    std::queue<std::string> input_queue_;
-    std::queue<std::string> output_queue_;
-    std::mutex              input_queue_mutex_;
-    std::mutex              output_queue_mutex_;
+    tcp::socket                  socket_;
+    asio::steady_timer           timer_;
+    std::queue<std::string>      input_queue_;
+    std::mutex                   input_queue_mutex_;
+    ThreadSafeQueue<std::string> output_queue_; // 使用线程安全队列
 };
 
 class server
@@ -159,6 +215,7 @@ public:
 
     void update_all_sessions()
     {
+        // std::cout << "update_all_sessions:" << sessions_.size() << std::endl;
         std::unique_lock lock(sessions_mutex_);
         for (auto &s : sessions_)
         {

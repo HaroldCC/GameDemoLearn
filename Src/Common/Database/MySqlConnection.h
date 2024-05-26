@@ -57,7 +57,7 @@ namespace Database
 
         asio::io_context &GetIoContext()
         {
-            return *_ioCtx;
+            return _ioCtx;
         }
 
         asio::awaitable<QueryResultSetPtr> CoQuery(std::string_view sql);
@@ -86,17 +86,18 @@ namespace Database
 
         void Lock()
         {
-            _mutex.lock();
+            //     _mutex.lock();
         }
 
         bool TryLock()
         {
-            return _mutex.try_lock();
+            //     return _mutex.try_lock();
+            return true;
         }
 
         void UnLock()
         {
-            _mutex.unlock();
+            //     _mutex.unlock();
         }
 
         bool Query(std::string_view sql,
@@ -117,12 +118,14 @@ namespace Database
         bool                       _bPrepareError {false};
 
     private:
-        std::unique_ptr<std::thread>            _pWorkerThread;
-        MySqlHandle                            *_pMysqlHandle {nullptr};
-        MySqlConnectionInfo                    &_connectInfo;
-        MySqlConnectionType                     _mysqlConnType;
-        std::unique_ptr<asio::io_context>       _ioCtx;
-        std::unique_ptr<asio::io_context::work> _ioCtxWork;
-        mutable std::mutex                      _mutex;
+        std::unique_ptr<std::thread> _pWorkerThread;
+        MySqlHandle                 *_pMysqlHandle {nullptr};
+        MySqlConnectionInfo         &_connectInfo;
+        MySqlConnectionType          _mysqlConnType;
+        asio::io_context             _ioCtx;
+        asio::steady_timer           _timer;
+        // asio::executor_work_guard<asio::io_context::executor_type> _workGrard;
+        // std::unique_ptr<asio::io_context::work> _ioCtxWork;
+        // mutable std::mutex                      _mutex;
     };
 } // namespace Database

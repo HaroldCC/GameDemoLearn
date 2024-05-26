@@ -16,6 +16,7 @@ namespace Net
     ISession::ISession(asio::ip::tcp::socket &&socket)
         : _socket(std::move(socket))
         , _remoteAddress(_socket.remote_endpoint().address())
+        , _timer(_socket.get_executor())
         , _remotePort(_socket.remote_endpoint().port())
         , _closed(false)
         , _closing(false)
@@ -41,23 +42,6 @@ namespace Net
 
     void ISession::SendProtoMessage(size_t header, const std::string &message)
     {
-        // NetMessage::Message send;
-        // send.set_header(static_cast<uint32_t>(header));
-        // Log::Debug("header = {}", header);
-        // send.set_content(message);
-        // MessageBuffer content(send.ByteSizeLong());
-        // if (send.SerializeToArray(content.GetWritPointer(), (int)content.WritableBytes()))
-        // {
-        //     content.WriteDone(send.ByteSizeLong());
-        //     Log::Debug("send len:{}", content.ReadableBytes());
-        //     _writeBufferQueue.push(std::move(content));
-
-        //     AsyncWrite();
-        // }
-        // else
-        // {
-        //     Log::Error("发送消息出错：【header:{}, content:{}】", header, message);
-        // }
     }
 
     void ISession::SendMsg(const MessageBuffer &message)
@@ -68,7 +52,7 @@ namespace Net
         }
 
         _writeBufferQueue.Push(message);
-        // AsyncWrite();
+        _timer.cancel();
     }
 
     void ISession::CloseSession()
@@ -93,7 +77,8 @@ namespace Net
     {
         while (true)
         {
-            Log::Debug("readLoop");
+            MessageBuffer _buffer;
+            Log::Debug("readLoop {}, {}", _buffer.ReadableBytes(), _buffer.WritableBytes());
             auto [errcode, length] = co_await _socket.async_read_some(
                 asio::buffer(_buffer.GetWritPointer(), _buffer.WritableBytes()));
 
@@ -113,51 +98,28 @@ namespace Net
             _buffer.WriteDone(length);
             _readBufferQueue.Push(std::move(_buffer));
         }
-
-        // auto self(shared_from_this());
-        // _socket.async_read_some(asio::buffer(_buffer.GetWritPointer(), _buffer.WritableBytes()),
-        //                         [self](const std::error_code &errcode, size_t length) mutable {
-        //                             if (errcode)
-        //                             {
-        //                                 if (errcode != asio::error::eof)
-        //                                 {
-        //                                     Log::Error("读取消息出错：{}", errcode.message());
-        //                                 }
-
-        //                                 self->CloseSession();
-        //                                 return;
-        //                             }
-
-        //                             // if (length == 0)
-        //                             // {
-        //                             //     Log::Warn("读取数据长度为0");
-        //                             //     return;
-        //                             // }
-
-        //                             Log::Debug("async Read:{}", length);
-
-        //                             // 更新写入数据量
-        //                             self->_buffer.WriteDone(length);
-
-        //                             self->_readBufferQueue.Push(std::move(self->_buffer));
-
-        //                             self->AsyncRead();
-        //                         });
     }
 
     asio::awaitable<void> ISession::WriteLoop()
     {
-        while (true)
+        while (_socket.is_open())
         {
-            if (_writeBufferQueue.Empty())
-            {
-                continue;
-            }
-
             MessageBuffer packet;
+            Log::Debug("Write");
             if (!_writeBufferQueue.Pop(packet))
             {
-                continue;
+                _timer.expires_at((std::chrono::steady_clock::time_point::max)());
+                std::error_code errcode;
+                co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, errcode));
+                if (!errcode)
+                {
+                    Log::Error("发送协程等待消息错误：{}", errcode.message());
+                }
+            }
+
+            if (_closed)
+            {
+                co_return;
             }
 
             auto [errcode, length] =

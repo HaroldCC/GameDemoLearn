@@ -11,7 +11,7 @@
 
 namespace Net
 {
-    class IServer : public std::enable_shared_from_this<IServer>
+    class IServer //: public std::enable_shared_from_this<IServer>
     {
     public:
         IServer(const IServer &)            = delete;
@@ -33,8 +33,8 @@ namespace Net
     protected:
         std::thread                                  _logicThread;
         std::mutex                                   _mutex;
-        Asio::io_context                             _ioCtx;
-        Asio::io_context                             _logicCtx;
+        Asio::io_context                             _netIoCtx;
+        Asio::io_context                             _logicIoCtx;
         Asio::signal_set                             _signals;
         Asio::endpoint                               _listenEndPoint;
         Asio::acceptor                               _acceptor;

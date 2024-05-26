@@ -96,9 +96,9 @@ namespace Net
     protected:
         Asio::socket                         _socket;
         Asio::address                        _remoteAddress;
+        Asio::steady_timer                   _timer;
         uint16_t                             _remotePort;
         uint32_t                             _header {0};
-        MessageBuffer                        _buffer;
         ProducerConsumerQueue<MessageBuffer> _readBufferQueue;
         ProducerConsumerQueue<MessageBuffer> _writeBufferQueue;
 

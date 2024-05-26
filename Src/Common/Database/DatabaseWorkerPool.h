@@ -68,10 +68,10 @@ namespace Database
     private:
         uint32_t OpenConnections(EConnectionTypeIndex type, uint8_t openConnectionCount);
 
-        ConnectionType *GetFreeConnectionAndLock();
+        std::shared_ptr<ConnectionType> GetFreeConnectionAndLock();
 
     private:
-        std::array<std::vector<std::unique_ptr<ConnectionType>>, EConnectionTypeIndex_Max> _typeConnections;
+        std::array<std::vector<std::shared_ptr<ConnectionType>>, EConnectionTypeIndex_Max> _typeConnections;
         // std::vector<std::unique_ptr<asio::io_context>>                                     _ioContexts;
         // std::vector<std::unique_ptr<asio::io_context::work>>                               _ioCtxWorks;
         std::atomic<size_t>                  _queueSize;

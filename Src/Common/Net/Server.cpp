@@ -13,12 +13,12 @@
 namespace Net
 {
     IServer::IServer(std::string_view ip, uint16_t port)
-        : _ioCtx(1)
-        , _logicCtx(1)
-        , _signals(_ioCtx)
+        : _netIoCtx(1)
+        , _logicIoCtx(1)
+        , _signals(_netIoCtx)
         , _listenEndPoint(Asio::make_address(ip), port)
-        , _acceptor(_ioCtx, _listenEndPoint)
-        , _updateTimer(_logicCtx)
+        , _acceptor(_netIoCtx, _listenEndPoint)
+        , _updateTimer(_logicIoCtx)
     {
     }
 
@@ -34,19 +34,20 @@ namespace Net
     void IServer::Start()
     {
         // 启动逻辑线程
-        auto self(shared_from_this());
-        _logicThread = std::thread([self]() {
+        // auto self(shared_from_this());
+        _logicThread = std::thread([this]() {
             try
             {
                 using namespace std::chrono_literals;
-                self->_updateTimer.expires_from_now(1ms);
-                self->_updateTimer.async_wait([self](const std::error_code &errcode) {
-                    self->Update();
+                _updateTimer.expires_from_now(1ms);
+                _updateTimer.async_wait([this](const std::error_code &errcode) {
+                    Update();
                 });
                 std::stringstream ss;
                 ss << std::this_thread::get_id();
                 Log::Debug("逻辑线程启动：{}", ss.str());
-                self->_logicCtx.run();
+                _logicIoCtx.run();
+                Log::Debug("logic thread stoping.....");
             }
             catch (const std::exception &e)
             {
@@ -64,11 +65,11 @@ namespace Net
             _signals.add(SIGINT);
             _signals.add(SIGTERM);
             _signals.async_wait([this](const std::error_code &errcode, int signal) {
-                _ioCtx.stop();
+                _netIoCtx.stop();
             });
 
-            Asio::co_spawn(_ioCtx, AcceptLoop(), asio::detached);
-            _ioCtx.run();
+            Asio::co_spawn(_netIoCtx, AcceptLoop(), asio::detached);
+            _netIoCtx.run();
         }
         catch (const std::exception &e)
         {

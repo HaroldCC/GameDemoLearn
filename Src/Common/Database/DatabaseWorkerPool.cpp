@@ -37,7 +37,7 @@ namespace Database
                   _syncThreadCount,
                   _asyncThreadCount);
 
-        // _ioContext = std::make_unique<asio::io_context>(_asyncThreadCount);
+        // _ioContext = std::make_unique<asio::io_context(_asyncThreadCount);
 
         uint32_t errcode = OpenConnections(EConnectionTypeIndex_Async, _asyncThreadCount);
         if (0 != errcode)
@@ -182,7 +182,7 @@ namespace Database
             return;
         }
 
-        ConnectionType *pConnection = GetFreeConnectionAndLock();
+        auto pConnection = GetFreeConnectionAndLock();
         pConnection->Execute(sql);
         pConnection->UnLock();
     }
@@ -195,7 +195,7 @@ namespace Database
             return;
         }
 
-        ConnectionType *pConnection = GetFreeConnectionAndLock();
+        auto pConnection = GetFreeConnectionAndLock();
         pConnection->Execute(pStmt);
         pConnection->UnLock();
     }
@@ -248,14 +248,15 @@ namespace Database
     void DatabaseWorkerPool<ConnectionType>::CoQuery(std::string_view                         sql,
                                                      std::function<void(QueryResultSetPtr)> &&f)
     {
+        Log::Debug("database pool sql:{}", sql);
         auto pConnection = GetFreeConnectionAndLock();
-        pConnection->UnLock();
         asio::co_spawn(pConnection->GetIoContext(),
                        pConnection->CoQuery(sql),
                        [](std::exception_ptr ex, QueryResultSetPtr pResult) {
                            //    f(pResult);
-                           Log::Debug("result");
+                           Log::Debug("==================result");
                        });
+        pConnection->UnLock();
     }
 
     template <typename ConnectionType>
@@ -266,7 +267,7 @@ namespace Database
             return nullptr;
         }
 
-        ConnectionType   *pConnection = GetFreeConnectionAndLock();
+        auto              pConnection = GetFreeConnectionAndLock();
         QueryResultSetPtr pResult     = pConnection->Query(sql);
         pConnection->UnLock();
 
@@ -281,7 +282,7 @@ namespace Database
             return nullptr;
         }
 
-        ConnectionType           *pConnection = GetFreeConnectionAndLock();
+        auto                      pConnection = GetFreeConnectionAndLock();
         PreparedQueryResultSetPtr pResult     = pConnection->Query(pStmt);
         pConnection->UnLock();
 
@@ -298,8 +299,8 @@ namespace Database
                 MySqlConnectionType::Async,
                 MySqlConnectionType::Sync};
 
-            std::unique_ptr<ConnectionType> pConnection =
-                std::make_unique<ConnectionType>(*_pConnectionInfo, connectionTypes[type]);
+            std::shared_ptr<ConnectionType> pConnection =
+                std::make_shared<ConnectionType>(*_pConnectionInfo, connectionTypes[type]);
 
             Assert(nullptr != pConnection);
 
@@ -316,14 +317,14 @@ namespace Database
     }
 
     template <typename ConnectionType>
-    ConnectionType *DatabaseWorkerPool<ConnectionType>::GetFreeConnectionAndLock()
+    std::shared_ptr<ConnectionType> DatabaseWorkerPool<ConnectionType>::GetFreeConnectionAndLock()
     {
-        const auto      connectionCount = _typeConnections[EConnectionTypeIndex_Sync].size();
-        ConnectionType *pConnection     = nullptr;
-        uint8_t         index           = 0;
+        const auto                      connectionCount = _typeConnections[EConnectionTypeIndex_Sync].size();
+        std::shared_ptr<ConnectionType> pConnection     = nullptr;
+        uint8_t                         index           = 0;
         while (nullptr == pConnection)
         {
-            pConnection = _typeConnections[EConnectionTypeIndex_Sync][index++ % connectionCount].get();
+            pConnection = _typeConnections[EConnectionTypeIndex_Sync][index++ % connectionCount];
             if (pConnection->TryLock())
             {
                 break;

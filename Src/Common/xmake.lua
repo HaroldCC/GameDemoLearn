@@ -17,6 +17,6 @@ target("Common")
 
     after_build(function (target) 
         if is_plat("windows") then
-            os.cp("$(projectdir)/3rdParty/mysql/lib/libmysql.dll", target:targetdir())
+            os.trycp("$(projectdir)/3rdParty/mysql/lib/*.dll", target:targetdir())
         end
     end)

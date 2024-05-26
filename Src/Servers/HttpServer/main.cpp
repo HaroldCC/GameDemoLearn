@@ -12,8 +12,10 @@ int main()
 
     try
     {
-        auto pHttpServer = std::make_shared<HttpServer>("127.0.0.1", 10007);
-        pHttpServer->Start();
+        // auto pHttpServer = std::make_shared<HttpServer>("127.0.0.1", 10007);
+        // pHttpServer->Start();
+        HttpServer server("127.0.0.1", 10007);
+        server.Start();
     }
     catch (const std::exception &exception)
     {
