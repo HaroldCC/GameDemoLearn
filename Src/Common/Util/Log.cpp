@@ -64,11 +64,6 @@ namespace Log
 
         static spdlog::filename_t calc_filename(const spdlog::filename_t &fileName, std::size_t index)
         {
-            // if (index == 0u)
-            //{
-            //     return fileName;
-            // }
-
             const auto &[basename, ext] = spdlog::details::file_helper::split_by_extension(fileName);
             std::string strTimeStr      = std::format(
                 "{:%Y_%m_%d_%H_%M_%OS}",
@@ -87,7 +82,7 @@ namespace Log
         void sink_it_(const spdlog::details::log_msg &msg) override
         {
             spdlog::memory_buf_t formatted;
-            const char          *pPrefix = GetLogLevelHtmlPrefix(msg.level);
+            const char          *pPrefix = GetLogLevelHtmlPrefix(msg.log_level);
             // 填充html前缀
             formatted.append(pPrefix, pPrefix + std::strlen(pPrefix));
 
@@ -183,7 +178,7 @@ namespace Log
             return std::rename(srcFileName.c_str(), targetFileName.c_str()) == 0;
         }
 
-        constexpr const char *GetLogLevelHtmlPrefix(spdlog::level::level_enum level)
+        constexpr const char *GetLogLevelHtmlPrefix(spdlog::level level)
         {
             const char *pPrefix = "";
             switch (level)
@@ -233,16 +228,16 @@ namespace Log
     {
         auto fileSink =
             std::make_shared<HtmlFormatSinkMt>(std::string(fileName), maxFileSize * 1024 * 1024, maxFiles);
-        fileSink->set_level(static_cast<spdlog::level::level_enum>(level));
+        fileSink->set_level(static_cast<spdlog::level>(level));
         fileSink->set_pattern(std::string(pattern));
 
         auto consoleSink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-        consoleSink->set_level(static_cast<spdlog::level::level_enum>(level));
+        consoleSink->set_level(static_cast<spdlog::level>(level));
         consoleSink->set_pattern(std::string(pattern));
 
         std::vector<spdlog::sink_ptr> sinks {fileSink, consoleSink};
         _logger = std::make_shared<spdlog::logger>("MultiLogger", std::begin(sinks), std::end(sinks));
-        _logger->set_level(static_cast<spdlog::level::level_enum>(level));
+        _logger->set_level(static_cast<spdlog::level>(level));
 
         spdlog::set_default_logger(_logger);
     }

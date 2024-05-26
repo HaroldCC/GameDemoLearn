@@ -17,9 +17,7 @@ namespace Http
     class HttpSession final : public Net::ISession
     {
     public:
-        using Net::ISession::ISession;
-
-        void AddRouter(HttpMethod method, std::string_view path, HttpHandlerFunc handler);
+        HttpSession(Asio::socket &&socket, HttpRouter &router);
 
     protected:
         void ReadHandler() override;
@@ -27,7 +25,7 @@ namespace Http
     private:
         HttpRequest  _req;
         HttpResponse _rep;
-        HttpRouter   _router;
+        HttpRouter  &_router;
     };
 
 } // namespace Http

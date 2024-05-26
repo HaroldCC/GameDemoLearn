@@ -7,6 +7,7 @@
 > Created Time    : 2024年01月05日  17时32分49秒
 ************************************************************************/
 #pragma once
+#define SPDLOG_SOURCE_LOCATION
 #include "spdlog/spdlog.h"
 
 #include <string_view>
@@ -22,51 +23,6 @@ constexpr inline std::string_view GetDefaultLogPattern()
 
 namespace Log
 {
-    class SourceLocation
-    {
-    public:
-        static constexpr SourceLocation Current(const char *fileName = __builtin_FILE(),
-                                                const char *funcName = __builtin_FUNCTION(),
-                                                uint32_t    lineNum  = __builtin_LINE())
-        {
-            return {fileName, funcName, lineNum};
-        }
-
-        constexpr SourceLocation(const char *fileName = __builtin_FILE(),
-                                 const char *funcName = __builtin_FUNCTION(),
-                                 uint32_t    lineNum  = __builtin_LINE()) noexcept
-            : _fileName(fileName)
-            , _funcName(funcName)
-            , _lineNum(lineNum)
-        {
-        }
-
-        [[nodiscard]] constexpr const char *FileName() const noexcept
-        {
-            return _fileName;
-        }
-
-        [[nodiscard]] constexpr const char *FuncName() const noexcept
-        {
-            return _funcName;
-        }
-
-        [[nodiscard]] constexpr std::uint32_t LineNum() const noexcept
-        {
-            return _lineNum;
-        }
-
-        inline operator spdlog::source_loc()
-        {
-            return {_fileName, static_cast<int>(_lineNum), _funcName};
-        }
-
-    private:
-        const char *_fileName {nullptr};
-        const char *_funcName {nullptr};
-        uint32_t    _lineNum {0};
-    };
-
     class CLogger final
     {
     public:
@@ -101,71 +57,40 @@ namespace Log
         std::shared_ptr<spdlog::logger> _logger;
     };
 
-    struct FormatWithLocation
-    {
-        std::string_view format;
-        SourceLocation   location;
-
-        template <typename String>
-        constexpr FormatWithLocation(String &&fmt, SourceLocation loc = SourceLocation::Current())
-            : format(std::forward<String>(fmt))
-            , location(loc)
-        {
-        }
-    };
-
     template <typename... Args>
-    inline void Tracy(FormatWithLocation fmt, Args &&...args)
+    inline void Tracy(spdlog::loc_with_fmt fmt, Args &&...args)
     {
-        spdlog::log(fmt.location,
-                    spdlog::level::level_enum::trace,
-                    fmt::runtime(fmt.format),
-                    std::forward<Args>(args)...);
+        spdlog::log(fmt.loc, spdlog::level::trace, fmt.fmt_string, std::forward<Args>(args)...);
     }
 
     template <typename... Args>
-    inline void Debug(FormatWithLocation fmt, Args &&...args)
+    inline void Debug(spdlog::loc_with_fmt fmt, Args &&...args)
     {
-        spdlog::log(fmt.location,
-                    spdlog::level::level_enum::debug,
-                    fmt::runtime(fmt.format),
-                    std::forward<Args>(args)...);
+        spdlog::log(fmt.loc, spdlog::level::debug, fmt.fmt_string, std::forward<Args>(args)...);
     }
 
     template <typename... Args>
-    inline void Info(FormatWithLocation fmt, Args &&...args)
+    inline void Info(spdlog::loc_with_fmt fmt, Args &&...args)
     {
-        spdlog::log(fmt.location,
-                    spdlog::level::level_enum::info,
-                    fmt::runtime(fmt.format),
-                    std::forward<Args>(args)...);
+        spdlog::log(fmt.loc, spdlog::level::info, fmt.fmt_string, std::forward<Args>(args)...);
     }
 
     template <typename... Args>
-    inline void Warn(FormatWithLocation fmt, Args &&...args)
+    inline void Warn(spdlog::loc_with_fmt fmt, Args &&...args)
     {
-        spdlog::log(fmt.location,
-                    spdlog::level::level_enum::warn,
-                    fmt::runtime(fmt.format),
-                    std::forward<Args>(args)...);
+        spdlog::log(fmt.loc, spdlog::level::warn, fmt.fmt_string, std::forward<Args>(args)...);
     }
 
     template <typename... Args>
-    inline void Error(FormatWithLocation fmt, Args &&...args)
+    inline void Error(spdlog::loc_with_fmt fmt, Args &&...args)
     {
-        spdlog::log(fmt.location,
-                    spdlog::level::level_enum::err,
-                    fmt::runtime(fmt.format),
-                    std::forward<Args>(args)...);
+        spdlog::log(fmt.loc, spdlog::level::err, fmt.fmt_string, std::forward<Args>(args)...);
     }
 
     template <typename... Args>
-    inline void Critical(FormatWithLocation fmt, Args &&...args)
+    inline void Critical(spdlog::loc_with_fmt fmt, Args &&...args)
     {
-        spdlog::log(fmt.location,
-                    spdlog::level::level_enum::critical,
-                    fmt::runtime(fmt.format),
-                    std::forward<Args>(args)...);
+        spdlog::log(fmt.loc, spdlog::level::critical, fmt.fmt_string, std::forward<Args>(args)...);
     }
 
 } // namespace Log

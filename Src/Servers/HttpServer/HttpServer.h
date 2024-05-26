@@ -15,15 +15,16 @@
 class HttpServer final : public Net::IServer
 {
 public:
-    using Net::IServer::IServer;
+    HttpServer(std::string_view ip, uint16_t port);
 
-    void InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSession);
+    void InitHttpRouter();
 
 protected:
-    asio::awaitable<void> AcceptLoop() override;
-
     void Update() override;
+
+    void OnScoketAccepted(Asio::socket &&socket) override;
 
 private:
     Database::QueryCallbackProcessor _queryCallbackProcessor;
+    Http::HttpRouter                 _router;
 };

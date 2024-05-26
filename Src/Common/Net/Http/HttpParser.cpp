@@ -185,8 +185,8 @@ namespace Http
 
     std::string_view HttpParser::TrimSpace(std::string_view str)
     {
-        str.remove_prefix(std::min(str.find_first_not_of(' '), str.size()));
-        str.remove_suffix(std::min(str.size() - str.find_last_not_of(' ') - 1, str.size()));
+        str.remove_prefix((std::min)(str.find_first_not_of(' '), str.size()));
+        str.remove_suffix((std::min)(str.size() - str.find_last_not_of(' ') - 1, str.size()));
 
         return str;
     }

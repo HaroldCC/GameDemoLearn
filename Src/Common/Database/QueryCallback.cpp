@@ -11,7 +11,6 @@
 
 #include <functional>
 
-#define ASIO_HAS_CO_AWAIT
 #include <asio/awaitable.hpp>
 
 namespace Database
@@ -29,19 +28,20 @@ namespace Database
     {
     }
 
-    QueryCallback::QueryCallback(QueryCallback&& right) noexcept {
+    QueryCallback::QueryCallback(QueryCallback &&right) noexcept
+    {
         using std::swap;
         swap(_future, right._future);
         swap(_isPreparedResult, right._isPreparedResult);
     }
 
-    QueryCallback& QueryCallback::operator=(QueryCallback&& right) noexcept {
+    QueryCallback &QueryCallback::operator=(QueryCallback &&right) noexcept
+    {
         using std::swap;
         swap(_future, right._future);
         swap(_isPreparedResult, right._isPreparedResult);
         return *this;
     }
-
 
     QueryCallback &&QueryCallback::Then(std::function<void(QueryResultSetPtr)> &&callback)
     {

@@ -132,40 +132,5 @@ namespace Net
                 co_return;
             }
         }
-
-        // MessageBuffer packet;
-        // if (!_writeBufferQueue.Pop(packet))
-        // {
-        //     co_return;
-        // }
-
-        // auto self(shared_from_this());
-        // asio::async_write(_socket,
-        //                   asio::buffer(packet.GetReadPointer(), packet.ReadableBytes()),
-        //                   [self](const std::error_code &errcode, std::size_t length) mutable {
-        //                       if (errcode)
-        //                       {
-        //                           self->CloseSession();
-        //                           Log::Error("发送消息失败：{}", errcode.message());
-        //                           return;
-        //                       }
-
-        //                       Log::Debug("Write done:{} currend thread:{}", length);
-        //                       // packet.ReadDone(length);
-
-        //                       // if (packet.ReadableBytes() != 0)
-        //                       // {
-        //                       //     Log::Warn("packet的消息未读处理完就抛弃！！！");
-        //                       // }
-
-        //                       if (!self->_writeBufferQueue.Empty())
-        //                       {
-        //                           self->AsyncWrite();
-        //                       }
-        //                       else if (self->_closing)
-        //                       {
-        //                           self->CloseSession();
-        //                       }
-        //                   });
     }
 } // namespace Net

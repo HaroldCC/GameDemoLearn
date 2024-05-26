@@ -107,4 +107,25 @@ namespace Net
                                        }),
                         _sessions.end());
     }
+
+    asio::awaitable<void> IServer::AcceptLoop()
+    {
+        while (true)
+        {
+            auto [errcode, socket] = co_await _acceptor.async_accept();
+            if (errcode)
+            {
+                Log::Error("接受连接失败：{}", errcode.message());
+                co_return;
+            }
+
+            OnScoketAccepted(std::move(socket));
+        }
+    }
+
+    void IServer::AddNewSession(std::shared_ptr<ISession> pNewSession)
+    {
+        std::lock_guard lock(_mutex);
+        _sessions.emplace_back(pNewSession);
+    }
 } // namespace Net

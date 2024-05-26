@@ -12,20 +12,23 @@
 #include "Common/Util/Assert.h"
 #include "Common/Database/DatabaseImpl/LoginDatabase.h"
 
-void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSession)
+HttpServer::HttpServer(std::string_view ip, uint16_t port) : Net::IServer(ip, port)
 {
-    Assert(nullptr != pSession);
+    InitHttpRouter();
+}
 
-    pSession->AddRouter(Http::HttpMethod::Get,
-                        "/",
-                        [](const Http::HttpRequest &request, Http::HttpResponse &resp) {
-                            resp.SetStatusCode(Http::StatusCode::Ok);
-                            std::string_view body = "Hello 你好!";
-                            resp.SetCharSet("UTF-8BOM");
-                            resp.SetContent(body);
-                            return;
-                        });
-    pSession->AddRouter(
+void HttpServer::InitHttpRouter()
+{
+    _router.AddHttpHandler(Http::HttpMethod::Get,
+                           "/",
+                           [](const Http::HttpRequest &request, Http::HttpResponse &resp) {
+                               resp.SetStatusCode(Http::StatusCode::Ok);
+                               std::string_view body = "Hello 你好!";
+                               resp.SetCharSet("UTF-8BOM");
+                               resp.SetContent(body);
+                               return;
+                           });
+    _router.AddHttpHandler(
         Http::HttpMethod::Get,
         "/user",
         [](const Http::HttpRequest &request, Http::HttpResponse &resp) {
@@ -103,23 +106,12 @@ void HttpServer::InitHttpRouter(const std::shared_ptr<Http::HttpSession> &pSessi
         });
 }
 
-asio::awaitable<void> HttpServer::AcceptLoop()
+void HttpServer::OnScoketAccepted(Asio::socket &&socket)
 {
-    while (true)
-    {
-        auto [errcode, socket] = co_await _acceptor.async_accept();
-        if (errcode)
-        {
-            Log::Error("接受连接失败：{}", errcode.message());
-            co_return;
-        }
+    auto pSession = std::make_shared<Http::HttpSession>(std::move(socket), _router);
+    pSession->StartSession();
 
-        auto            pSession = std::make_shared<Http::HttpSession>(std::move(socket));
-        std::lock_guard lock(_mutex);
-        _sessions.emplace_back(pSession);
-        InitHttpRouter(pSession);
-        pSession->StartSession();
-    }
+    AddNewSession(pSession);
 }
 
 void HttpServer::Update()

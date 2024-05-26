@@ -12,9 +12,10 @@
 namespace Http
 {
 
-    void HttpSession::AddRouter(HttpMethod method, std::string_view path, HttpHandlerFunc handler)
+    HttpSession::HttpSession(Asio::socket &&socket, HttpRouter &router)
+        : Net::ISession(std::move(socket))
+        , _router(router)
     {
-        _router.AddHttpHandler(method, path, std::move(handler));
     }
 
     void HttpSession::ReadHandler()
