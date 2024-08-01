@@ -15,9 +15,11 @@
 #include <unordered_map>
 #include <set>
 
+#include "asio.hpp"
+
 namespace Http
 {
-    using HttpHandlerFunc = std::function<void(const HttpRequest &, HttpResponse &)>;
+    using HttpHandlerFunc = std::function<asio::awaitable<void>(const HttpRequest &, HttpResponse &)>;
 
     class HttpRouter final
     {

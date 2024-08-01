@@ -38,6 +38,7 @@ namespace Database
                   _asyncThreadCount);
 
         // _ioContext = std::make_unique<asio::io_context(_asyncThreadCount);
+        _pIoCtx = std::make_unique<asio::io_context>(_asyncThreadCount);
 
         uint32_t errcode = OpenConnections(EConnectionTypeIndex_Async, _asyncThreadCount);
         if (0 != errcode)
@@ -53,10 +54,10 @@ namespace Database
 
         for (const auto &pConnection : _typeConnections[EConnectionTypeIndex_Async])
         {
-            // std::unique_ptr<asio::io_context>       pIoCtx = std::make_unique<asio::io_context>();
+            // std::unique_ptr<asio::io_context> pIoCtx = std::make_unique<asio::io_context>(1);
             // std::unique_ptr<asio::io_context::work> pIoCtxWork =
             //     std::make_unique<asio::io_context::work>(*pIoCtx);
-            pConnection->StartWorkerThread();
+            pConnection->StartWorkerThread(_pIoCtx.get());
             // _ioContexts.emplace_back(std::move(pIoCtx));
             // _ioCtxWorks.emplace_back(std::move(pIoCtxWork));
         }
@@ -250,13 +251,67 @@ namespace Database
     {
         Log::Debug("database pool sql:{}", sql);
         auto pConnection = GetFreeConnectionAndLock();
-        asio::co_spawn(pConnection->GetIoContext(),
+        asio::co_spawn(_pIoCtx->get_executor(),
                        pConnection->CoQuery(sql),
-                       [](std::exception_ptr ex, QueryResultSetPtr pResult) {
-                           //    f(pResult);
+                       [f](std::exception_ptr ex, QueryResultSetPtr pResult) {
+                           f(pResult);
                            Log::Debug("==================result");
                        });
         pConnection->UnLock();
+    }
+
+    template <typename ConnectionType>
+    void DatabaseWorkerPool<ConnectionType>::CoQuery(PreparedStatementBase                           *pStmt,
+                                                     std::function<void(PreparedQueryResultSetPtr)> &&f)
+    {
+        if (nullptr == pStmt)
+        {
+            return;
+        }
+
+        auto pConnection = GetFreeConnectionAndLock();
+        // auto co          = pConnection->CoQuery(pStmt);
+        Log::Info("begin coQuery");
+        asio::co_spawn(
+            _pIoCtx->get_executor(),
+            DatabaseWorkerPool<ConnectionType>::CoQueryImpl(pConnection.get(), pStmt, std::move(f)),
+            asio::detached);
+        //    [f = std::move(f)](PreparedQueryResultSetPtr pResult) mutable {
+        //        f(pResult);
+        //        Log::Debug("==================result");
+        //    });
+        Log::Info("end coQuery");
+        pConnection->UnLock();
+    }
+
+    template <typename ConnectionType>
+    asio::awaitable<void>
+    DatabaseWorkerPool<ConnectionType>::CoQueryImpl(IMySqlConnection      *pConnection,
+                                                    PreparedStatementBase *pStmt,
+                                                    std::function<void(PreparedQueryResultSetPtr)> &&f)
+    {
+        Log::Debug("co queryImpl --------------");
+        auto pResult = co_await pConnection->CoQuery(pStmt);
+        if (pResult == nullptr)
+        {
+            Log::Warn("CoQueryImpl empty result");
+            co_return;
+        }
+
+        std::ostringstream ss;
+        ss << std::this_thread::get_id();
+        Log::Warn("co queryimpl result:{}", ss.str());
+
+        Database::Field *pFields = pResult->Fetch();
+        uint32_t         id      = pFields[0];
+        const char      *strName = pFields[1];
+        const char      *email   = pFields[2];
+        uint32_t         age     = pFields[3];
+        std::string      intro   = pFields[4];
+
+        Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
+
+        f(pResult);
     }
 
     template <typename ConnectionType>

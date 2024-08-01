@@ -62,9 +62,10 @@ namespace Net
         // 启动网络协程
         try
         {
-            _signals.add(SIGINT);
+            // _signals.add(SIGINT);
             _signals.add(SIGTERM);
             _signals.async_wait([this](const std::error_code &errcode, int signal) {
+                Log::Debug("signal:{}", signal);
                 _netIoCtx.stop();
             });
 

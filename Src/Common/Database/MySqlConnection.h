@@ -55,12 +55,13 @@ namespace Database
         QueryResultSetPtr         Query(std::string_view sql);
         PreparedQueryResultSetPtr Query(PreparedStatementBase *pStmt);
 
-        asio::io_context &GetIoContext()
-        {
-            return _ioCtx;
-        }
+        // asio::io_context &GetIoContext()
+        // {
+        //     return _ioCtx;
+        // }
 
-        asio::awaitable<QueryResultSetPtr> CoQuery(std::string_view sql);
+        asio::awaitable<QueryResultSetPtr>         CoQuery(std::string_view sql);
+        asio::awaitable<PreparedQueryResultSetPtr> CoQuery(PreparedStatementBase *pStmt);
 
         void BeginTransaction();
         void CommitTransaction();
@@ -70,7 +71,7 @@ namespace Database
 
         void Ping() const;
 
-        void StartWorkerThread();
+        void StartWorkerThread(asio::io_context *pIoCtx);
 
         std::thread::id GetWorkerThreadID() const
         {
@@ -122,8 +123,8 @@ namespace Database
         MySqlHandle                 *_pMysqlHandle {nullptr};
         MySqlConnectionInfo         &_connectInfo;
         MySqlConnectionType          _mysqlConnType;
-        asio::io_context             _ioCtx;
-        asio::steady_timer           _timer;
+        // asio::io_context             _ioCtx;
+        // asio::steady_timer           _timer;
         // asio::executor_work_guard<asio::io_context::executor_type> _workGrard;
         // std::unique_ptr<asio::io_context::work> _ioCtxWork;
         // mutable std::mutex                      _mutex;

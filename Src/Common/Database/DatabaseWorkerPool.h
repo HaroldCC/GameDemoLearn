@@ -59,6 +59,11 @@ namespace Database
         QueryCallback AsyncQuery(PreparedStatementBase *pStmt);
 
         void CoQuery(std::string_view sql, std::function<void(QueryResultSetPtr)> &&f);
+        void CoQuery(PreparedStatementBase *pStmt, std::function<void(PreparedQueryResultSetPtr)> &&f);
+
+        asio::awaitable<void> CoQueryImpl(IMySqlConnection                                *pConnection,
+                                          PreparedStatementBase                           *pStmt,
+                                          std::function<void(PreparedQueryResultSetPtr)> &&f);
 
         QueryResultSetPtr         SyncQuery(std::string_view sql);
         PreparedQueryResultSetPtr SyncQuery(PreparedStatementBase *pStmt);
@@ -73,6 +78,7 @@ namespace Database
     private:
         std::array<std::vector<std::shared_ptr<ConnectionType>>, EConnectionTypeIndex_Max> _typeConnections;
         // std::vector<std::unique_ptr<asio::io_context>>                                     _ioContexts;
+        std::unique_ptr<asio::io_context> _pIoCtx;
         // std::vector<std::unique_ptr<asio::io_context::work>>                               _ioCtxWorks;
         std::atomic<size_t>                  _queueSize;
         std::unique_ptr<MySqlConnectionInfo> _pConnectionInfo;

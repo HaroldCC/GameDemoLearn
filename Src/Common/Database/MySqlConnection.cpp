@@ -24,13 +24,15 @@ namespace Database
     IMySqlConnection::IMySqlConnection(MySqlConnectionInfo &info, MySqlConnectionType connType)
         : _connectInfo(info)
         , _mysqlConnType(connType)
-        , _ioCtx(1)
-        , _timer(_ioCtx, std::chrono::seconds(3))
+    // , _ioCtx(1)
+    // , _timer(_ioCtx)
     // , _workGrard(asio::make_work_guard(_ioCtx))
     {
         // _timer.async_wait([](const std::error_code &errcode) {
         //     Log::Debug("mysql timer running:{}", errcode.message());
         // });
+
+        Log::Debug("create MysqlConnection");
     }
 
     IMySqlConnection::~IMySqlConnection()
@@ -201,10 +203,13 @@ namespace Database
             return nullptr;
         }
 
-        MySqlResult *pResult    = nullptr;
-        MySqlField  *pFields    = nullptr;
-        uint64_t     rowCount   = 0;
-        uint32_t     fieldCount = 0;
+        MySqlResult       *pResult    = nullptr;
+        MySqlField        *pFields    = nullptr;
+        uint64_t           rowCount   = 0;
+        uint32_t           fieldCount = 0;
+        std::ostringstream ss;
+        ss << std::this_thread::get_id();
+        Log::Debug("**********Query thread id:{}", ss.str());
         if (!Query(sql, pResult, pFields, rowCount, fieldCount))
         {
             return nullptr;
@@ -235,12 +240,38 @@ namespace Database
         co_return MakeQueryResultSetPtr(pResult, pFields, rowCount, fieldCount);
     }
 
+    asio::awaitable<PreparedQueryResultSetPtr> IMySqlConnection::CoQuery(PreparedStatementBase *pStmt)
+    {
+        Log::Warn("CoQuery Begin==============");
+        if (nullptr == pStmt)
+        {
+            co_return nullptr;
+        }
+
+        MySqlPreparedStatement *pPreparedStmt = nullptr;
+        MySqlResult            *pResult       = nullptr;
+        // MySqlField             *pFields       = nullptr;
+        uint64_t rowCount   = 0;
+        uint32_t fieldCount = 0;
+        if (!Query(pStmt, pPreparedStmt, pResult, rowCount, fieldCount))
+        {
+            Log::Debug("query nullptr");
+            co_return nullptr;
+        }
+
+        Log::Debug("query result:{},{}", rowCount, fieldCount);
+        co_return MakePreparedQueryResultSetPtr(pPreparedStmt->GetMySqlStmt(), pResult, rowCount, fieldCount);
+    }
+
     PreparedQueryResultSetPtr IMySqlConnection::Query(PreparedStatementBase *pStmt)
     {
         MySqlPreparedStatement *pPreparedStmt = nullptr;
         MySqlResult            *pResult       = nullptr;
         uint64_t                rowCount      = 0;
         uint32_t                fieldCount    = 0;
+        std::ostringstream      ss;
+        ss << std::this_thread::get_id();
+        Log::Debug("**********Query thread id:{}", ss.str());
         if (!Query(pStmt, pPreparedStmt, pResult, rowCount, fieldCount))
         {
             return nullptr;
@@ -274,20 +305,29 @@ namespace Database
         mysql_ping(_pMysqlHandle);
     }
 
-    void IMySqlConnection::StartWorkerThread()
+    void IMySqlConnection::StartWorkerThread(asio::io_context *pIoCtx)
     {
         // auto wg        = asio::make_work_guard(pIoCtx);
         // _ioCtxWork     = std::make_unique<asio::io_context::work>(_ioCtx);
-        _pWorkerThread = std::make_unique<std::thread>([this] {
+        // asio::signal_set signal(*pIoCtx);
+        // signal.add(SIGABRT);
+        // signal.async_wait([this, pIoCtx](const std::error_code &errcode, int signal) {
+        //     Log::Debug("mysql connection signal:{}", signal);
+        //     pIoCtx->stop();
+        // });
+        _pWorkerThread = std::make_unique<std::thread>([pIoCtx] {
             try
             {
-                //_timer.async_wait([](const std::error_code &errcode) {
-                //    Log::Debug("mysql timer running:{}", errcode.message());
-                //});
-                // auto wg = asio::make_work_guard(_ioCtx);
+                //using namespace std::chrono_literals;
+                // _timer.expires_from_now(1s);
+                // _timer.async_wait([this](const std::error_code &errcode) {
+                //     Log::Debug("mysql timer running:{}", errcode.message());
+                // });
+                auto wg = asio::require(pIoCtx->get_executor(), asio::execution::outstanding_work.tracked);
                 Log::Debug("mysql running.....");
                 std::error_code errcode;
-                _ioCtx.run(errcode);
+                // _ioCtx.run();
+                pIoCtx->run();
                 if (errcode)
                 {
                     Log::Error("sql connection running failed:{}", errcode.message());
