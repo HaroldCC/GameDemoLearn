@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <string_view>
 #include <optional>
+#include <string>
 
 namespace Database
 {

@@ -13,14 +13,16 @@
 
 namespace Net
 {
-    ISession::ISession(asio::ip::tcp::socket &&socket)
+    ISession::ISession(asio::ip::tcp::socket &&socket, asio::io_context *pLogicIOCtx)
         : _socket(std::move(socket))
         , _remoteAddress(_socket.remote_endpoint().address())
         , _timer(_socket.get_executor())
         , _remotePort(_socket.remote_endpoint().port())
+        , _pLogicIOCtx(pLogicIOCtx)
         , _closed(false)
         , _closing(false)
     {
+        _timer.expires_at((std::chrono::steady_clock::time_point::max)());
     }
 
     ISession::~ISession()
@@ -52,7 +54,7 @@ namespace Net
         }
 
         _writeBufferQueue.Push(message);
-        _timer.cancel();
+        _timer.cancel_one();
     }
 
     void ISession::CloseSession()
@@ -108,13 +110,15 @@ namespace Net
             Log::Debug("Write");
             if (!_writeBufferQueue.Pop(packet))
             {
-                _timer.expires_at((std::chrono::steady_clock::time_point::max)());
                 std::error_code errcode;
                 co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, errcode));
-                if (!errcode)
-                {
-                    Log::Error("发送协程等待消息错误：{}", errcode.message());
-                }
+                // _timer.expires_at((std::chrono::steady_clock::time_point::max)());
+                // std::error_code errcode;
+                // co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, errcode));
+                // if (!errcode)
+                // {
+                //     Log::Error("发送协程等待消息错误：{}", errcode.message());
+                // }
             }
 
             if (_closed)

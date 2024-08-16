@@ -61,9 +61,9 @@ namespace Database
         void CoQuery(std::string_view sql, std::function<void(QueryResultSetPtr)> &&f);
         void CoQuery(PreparedStatementBase *pStmt, std::function<void(PreparedQueryResultSetPtr)> &&f);
 
-        asio::awaitable<void> CoQueryImpl(IMySqlConnection                                *pConnection,
-                                          PreparedStatementBase                           *pStmt,
-                                          std::function<void(PreparedQueryResultSetPtr)> &&f);
+        asio::awaitable<void> CoQueryImpl(IMySqlConnection      *pConnection,
+                                          PreparedStatementBase *pStmt,
+                                          std::vector<std::function<void(PreparedQueryResultSetPtr)>> *f);
 
         QueryResultSetPtr         SyncQuery(std::string_view sql);
         PreparedQueryResultSetPtr SyncQuery(PreparedStatementBase *pStmt);

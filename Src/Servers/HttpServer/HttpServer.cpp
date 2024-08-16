@@ -27,6 +27,7 @@ void HttpServer::InitHttpRouter()
             std::string_view body = "Hello 你好!";
             resp.SetCharSet("UTF-8BOM");
             resp.SetContent(body);
+            co_return;
         });
     _router.AddHttpHandler(
         Http::HttpMethod::Get,
@@ -48,7 +49,9 @@ void HttpServer::InitHttpRouter()
                 pStmt,
                 // R"(select id, name, email, age, intro from account where email="123456@qq.com")",
                 [&resp](Database::PreparedQueryResultSetPtr pResult) {
-                    Log::Info("=======Query callback");
+                    std::ostringstream ss;
+                    ss << std::this_thread::get_id();
+                    Log::Error("=======Query End:{}", ss.str());
                     if (pResult == nullptr)
                     {
                         resp.SetStatusCode(Http::StatusCode::InternalServerError);
@@ -75,41 +78,8 @@ void HttpServer::InitHttpRouter()
 
             std::ostringstream ss;
             ss << std::this_thread::get_id();
-            Log::Debug("-------------------------------:{}", ss.str());
-            std::this_thread::sleep_for(std::chrono::seconds(10));
-
-            // Database::PreparedStatementBase *pStmt = Database::g_LoginDatabase.GetPrepareStatement(
-            //     Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
-            // pStmt->SerialValue(data->second, "123456@qq.com");
-
-            // //Database::PreparedQueryResultSetPtr pResult = Database::g_LoginDatabase.SyncQuery(pStmt);
-            // _queryCallbackProcessor.AddCallback(Database::g_LoginDatabase.AsyncQuery(pStmt).Then(
-            //     [&resp](Database::PreparedQueryResultSetPtr pResult) {
-            //         if (nullptr == pResult)
-            //         {
-            //             resp.SetStatusCode(Http::StatusCode::InternalServerError);
-            //             return;
-            //         }
-
-            //         Database::Field *pFields = pResult->Fetch();
-            //         uint32_t         id      = pFields[0];
-            //         const char      *strName = pFields[1];
-            //         const char      *email   = pFields[2];
-            //         uint32_t         age     = pFields[3];
-            //         std::string      intro   = pFields[4];
-
-            //         resp.SetContent(std::format("id:{}, email:{}, name:{}, age:{}, intro:{}",
-            //                                     id,
-            //                                     email,
-            //                                     strName,
-            //                                     age,
-            //                                     intro));
-            //         Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
-
-            //         resp.SetStatusCode(Http::StatusCode::Ok);
-            //     }));
-
-            // std::this_thread::sleep_for(std::chrono::seconds(5));
+            Log::Warn("-------------------------------:{}", ss.str());
+            std::this_thread::sleep_for(std::chrono::seconds(3));
         });
 
     _router.AddHttpHandler(
@@ -155,9 +125,10 @@ void HttpServer::InitHttpRouter()
         });
 }
 
-void HttpServer::OnScoketAccepted(Asio::socket &&socket)
+void HttpServer::OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx)
 {
-    auto pSession = std::make_shared<Http::HttpSession>(std::move(socket), _router);
+    auto pSession = std::make_shared<Http::HttpSession>(std::move(socket), pLogicIOCtx);
+    pSession->SetRouter(_router);
     pSession->StartSession();
 
     AddNewSession(pSession);

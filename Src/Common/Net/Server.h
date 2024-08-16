@@ -14,7 +14,7 @@ namespace Net
 
     class ISession;
 
-    class IServer //: public std::enable_shared_from_this<IServer>
+    class IServer
     {
     public:
         IServer(const IServer &)            = delete;
@@ -29,13 +29,13 @@ namespace Net
         void Start();
 
     protected:
-        virtual void Update();
+        virtual void Update() = 0;
 
         asio::awaitable<void> AcceptLoop();
 
         virtual void AddNewSession(std::shared_ptr<ISession> pNewSession);
 
-        virtual void OnScoketAccepted(Asio::socket &&socket) = 0;
+        virtual void OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx) = 0;
 
     protected:
         std::thread                                  _logicThread;

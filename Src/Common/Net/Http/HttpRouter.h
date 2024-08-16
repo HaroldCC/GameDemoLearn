@@ -24,7 +24,7 @@ namespace Http
     class HttpRouter final
     {
     public:
-        void Route(const HttpRequest &req, HttpResponse &resp);
+        asio::awaitable<void> Route(const HttpRequest &req, HttpResponse &resp);
 
         /**
          * @brief 添加Http处理函数  eg: GET hello/    POST hello/ 作为key

@@ -6,6 +6,7 @@ add_rules("mode.release", "mode.debug")
 add_rules("plugin.vsxmake.autoupdate")
 add_rules("plugin.compile_commands.autoupdate", {outputdir="$(projectdir)/.vscode", lsp="cland"})
 set_exceptions("cxx")
+set_defaultmode("debug")
 
 if is_plat("windows") then
     before_build(function (target) 

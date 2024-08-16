@@ -11,24 +11,27 @@
 
 namespace Http
 {
-
-    HttpSession::HttpSession(Asio::socket &&socket, HttpRouter &router)
-        : Net::ISession(std::move(socket))
-        , _router(router)
+    void HttpSession::SetRouter(HttpRouter &router)
     {
+        _router = router;
     }
 
     void HttpSession::ReadHandler()
     {
+        asio::co_spawn(_pLogicIOCtx->get_executor(), CoReadHandler(), asio::detached);
+    }
+
+    asio::awaitable<void> HttpSession::CoReadHandler()
+    {
         Net::MessageBuffer packet;
         if (!_readBufferQueue.Pop(packet))
         {
-            return;
+            co_return;
         }
 
         if (packet.ReadableBytes() <= 0)
         {
-            return;
+            co_return;
         }
 
         const std::string &content = packet.ReadAllAsString();
@@ -36,7 +39,7 @@ namespace Http
         {
             // Log::Info("Http:{}", content);
             _req.Parse(content);
-            _router.Route(_req, _rep);
+            co_await _router.Route(_req, _rep);
 
             std::string_view   response = _rep.GetPayload();
             Net::MessageBuffer sendBuffer(response.size());

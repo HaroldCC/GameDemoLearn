@@ -25,7 +25,7 @@ namespace Net
         ISession &operator=(const ISession &) = delete;
         ISession &operator=(ISession &&)      = delete;
 
-        explicit ISession(asio::ip::tcp::socket &&socket);
+        explicit ISession(asio::ip::tcp::socket &&socket, asio::io_context *pLogicIOCtx);
 
         virtual ~ISession();
 
@@ -101,6 +101,7 @@ namespace Net
         uint32_t                             _header {0};
         ProducerConsumerQueue<MessageBuffer> _readBufferQueue;
         ProducerConsumerQueue<MessageBuffer> _writeBufferQueue;
+        asio::io_context                    *_pLogicIOCtx;
 
         std::atomic_bool _closed;
         std::atomic_bool _closing;

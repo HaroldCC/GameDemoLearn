@@ -269,13 +269,18 @@ namespace Database
             return;
         }
 
+        auto *pVector = new std::vector<std::function<void(PreparedQueryResultSetPtr)>>();
+        pVector->emplace_back(f);
+
         auto pConnection = GetFreeConnectionAndLock();
         // auto co          = pConnection->CoQuery(pStmt);
-        Log::Info("begin coQuery");
-        asio::co_spawn(
-            _pIoCtx->get_executor(),
-            DatabaseWorkerPool<ConnectionType>::CoQueryImpl(pConnection.get(), pStmt, std::move(f)),
-            asio::detached);
+
+        std::ostringstream ss;
+        ss << std::this_thread::get_id();
+        Log::Error("=======begin query:{}", ss.str());
+        asio::co_spawn(_pIoCtx->get_executor(),
+                       DatabaseWorkerPool<ConnectionType>::CoQueryImpl(pConnection.get(), pStmt, pVector),
+                       asio::detached);
         //    [f = std::move(f)](PreparedQueryResultSetPtr pResult) mutable {
         //        f(pResult);
         //        Log::Debug("==================result");
@@ -285,22 +290,20 @@ namespace Database
     }
 
     template <typename ConnectionType>
-    asio::awaitable<void>
-    DatabaseWorkerPool<ConnectionType>::CoQueryImpl(IMySqlConnection      *pConnection,
-                                                    PreparedStatementBase *pStmt,
-                                                    std::function<void(PreparedQueryResultSetPtr)> &&f)
+    asio::awaitable<void> DatabaseWorkerPool<ConnectionType>::CoQueryImpl(
+        IMySqlConnection                                            *pConnection,
+        PreparedStatementBase                                       *pStmt,
+        std::vector<std::function<void(PreparedQueryResultSetPtr)>> *f)
     {
-        Log::Debug("co queryImpl --------------");
+        std::ostringstream ss;
+        ss << std::this_thread::get_id();
+        Log::Error("co queryImpl --------------{}", ss.str());
         auto pResult = co_await pConnection->CoQuery(pStmt);
         if (pResult == nullptr)
         {
             Log::Warn("CoQueryImpl empty result");
             co_return;
         }
-
-        std::ostringstream ss;
-        ss << std::this_thread::get_id();
-        Log::Warn("co queryimpl result:{}", ss.str());
 
         Database::Field *pFields = pResult->Fetch();
         uint32_t         id      = pFields[0];
@@ -311,7 +314,7 @@ namespace Database
 
         Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
 
-        f(pResult);
+        (*f)[0](pResult);
     }
 
     template <typename ConnectionType>

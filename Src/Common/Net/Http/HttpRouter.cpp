@@ -16,7 +16,7 @@
 namespace Http
 {
 
-    void HttpRouter::Route(const HttpRequest &req, HttpResponse &resp)
+    asio::awaitable<void> HttpRouter::Route(const HttpRequest &req, HttpResponse &resp)
     {
         std::string methodWholeName = std::format("{} {}", req.GetMethod(), req.GetPath());
 
@@ -24,7 +24,7 @@ namespace Http
         {
             try
             {
-                iter->second(req, resp);
+                co_await iter->second(req, resp);
             }
             catch (const std::exception &e)
             {

@@ -1,6 +1,5 @@
 ﻿#include "DemoServer.h"
 
-void DemoServer::OnScoketAccepted(Asio::socket &&socket)
-{
-    // AddNewSession()
-}
+// void DemoServer::OnAddSocket(Asio::socket &&socket)
+// {
+// }

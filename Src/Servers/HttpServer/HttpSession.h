@@ -17,15 +17,18 @@ namespace Http
     class HttpSession final : public Net::ISession
     {
     public:
-        HttpSession(Asio::socket &&socket, HttpRouter &router);
+        using Net::ISession::ISession;
+        // HttpSession(Asio::socket &&socket, asio::io_context *pLogicIOCtx, HttpRouter &router);
+        void SetRouter(HttpRouter &router);
 
     protected:
-        void ReadHandler() override;
+        void                  ReadHandler() override;
+        asio::awaitable<void> CoReadHandler();
 
     private:
         HttpRequest  _req;
         HttpResponse _rep;
-        HttpRouter  &_router;
+        HttpRouter   _router;
     };
 
 } // namespace Http

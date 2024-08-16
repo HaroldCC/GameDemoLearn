@@ -11,6 +11,7 @@
 #include "HttpCommon.h"
 
 #include <string_view>
+#include <string>
 
 namespace Http
 {

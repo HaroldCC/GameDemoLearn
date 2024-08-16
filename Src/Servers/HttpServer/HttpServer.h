@@ -22,7 +22,7 @@ public:
 protected:
     void Update() override;
 
-    void OnScoketAccepted(Asio::socket &&socket) override;
+    void OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx) override;
 
 private:
     Database::QueryCallbackProcessor _queryCallbackProcessor;

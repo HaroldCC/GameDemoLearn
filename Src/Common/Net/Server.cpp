@@ -46,6 +46,8 @@ namespace Net
                 std::stringstream ss;
                 ss << std::this_thread::get_id();
                 Log::Debug("逻辑线程启动：{}", ss.str());
+                // auto wg =
+                //     asio::require(_logicIoCtx.get_executor(), asio::execution::outstanding_work.tracked);
                 _logicIoCtx.run();
                 Log::Debug("logic thread stoping.....");
             }
@@ -120,7 +122,7 @@ namespace Net
                 co_return;
             }
 
-            OnScoketAccepted(std::move(socket));
+            OnScoketAccepted(std::move(socket), &_logicIoCtx);
         }
     }
 
