@@ -19,6 +19,11 @@ public:
 
     void InitHttpRouter();
 
+    const asio::io_context &GetCtx() const
+    {
+        return _logicIoCtx;
+    }
+
 protected:
     void Update() override;
 

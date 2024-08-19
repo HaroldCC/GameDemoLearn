@@ -24,15 +24,14 @@ namespace Database
     IMySqlConnection::IMySqlConnection(MySqlConnectionInfo &info, MySqlConnectionType connType)
         : _connectInfo(info)
         , _mysqlConnType(connType)
-    // , _ioCtx(1)
-    // , _timer(_ioCtx)
-    // , _workGrard(asio::make_work_guard(_ioCtx))
+        , _ioCtx(1)
     {
-        // _timer.async_wait([](const std::error_code &errcode) {
-        //     Log::Debug("mysql timer running:{}", errcode.message());
-        // });
-
         Log::Debug("create MysqlConnection");
+    }
+
+    bool IMySqlConnection::Update()
+    {
+        return true;
     }
 
     IMySqlConnection::~IMySqlConnection()
@@ -196,6 +195,36 @@ namespace Database
         return true;
     }
 
+    void IMySqlConnection::AsyncExecute(std::string_view sql)
+    {
+        if (sql.empty())
+        {
+            return;
+        }
+
+        asio::post(_ioWork, [this, strSql = std::string(sql)]() {
+            if (!Execute(strSql))
+            {
+                // do nothing
+            }
+        });
+    }
+
+    void IMySqlConnection::AsyncExecute(PreparedStatementBase *pStmt)
+    {
+        if (nullptr == pStmt)
+        {
+            return;
+        }
+
+        asio::post(_ioWork, [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)]() {
+            if (!Execute(pStmt.get()))
+            {
+                // do nothing
+            }
+        });
+    }
+
     QueryResultSetPtr IMySqlConnection::Query(std::string_view sql)
     {
         if (sql.empty())
@@ -216,51 +245,6 @@ namespace Database
         }
 
         return MakeQueryResultSetPtr(pResult, pFields, rowCount, fieldCount);
-    }
-
-    asio::awaitable<QueryResultSetPtr> IMySqlConnection::CoQuery(std::string_view sql)
-    {
-        Log::Debug("co query:{}", sql);
-        if (sql.empty())
-        {
-            co_return nullptr;
-        }
-
-        MySqlResult *pResult    = nullptr;
-        MySqlField  *pFields    = nullptr;
-        uint64_t     rowCount   = 0;
-        uint32_t     fieldCount = 0;
-        if (!Query(sql, pResult, pFields, rowCount, fieldCount))
-        {
-            Log::Debug("query nullptr");
-            co_return nullptr;
-        }
-
-        Log::Debug("query result:{},{}", rowCount, fieldCount);
-        co_return MakeQueryResultSetPtr(pResult, pFields, rowCount, fieldCount);
-    }
-
-    asio::awaitable<PreparedQueryResultSetPtr> IMySqlConnection::CoQuery(PreparedStatementBase *pStmt)
-    {
-        Log::Warn("CoQuery Begin==============");
-        if (nullptr == pStmt)
-        {
-            co_return nullptr;
-        }
-
-        MySqlPreparedStatement *pPreparedStmt = nullptr;
-        MySqlResult            *pResult       = nullptr;
-        // MySqlField             *pFields       = nullptr;
-        uint64_t rowCount   = 0;
-        uint32_t fieldCount = 0;
-        if (!Query(pStmt, pPreparedStmt, pResult, rowCount, fieldCount))
-        {
-            Log::Debug("query nullptr");
-            co_return nullptr;
-        }
-
-        Log::Debug("query result:{},{}", rowCount, fieldCount);
-        co_return MakePreparedQueryResultSetPtr(pPreparedStmt->GetMySqlStmt(), pResult, rowCount, fieldCount);
     }
 
     PreparedQueryResultSetPtr IMySqlConnection::Query(PreparedStatementBase *pStmt)
@@ -305,29 +289,15 @@ namespace Database
         mysql_ping(_pMysqlHandle);
     }
 
-    void IMySqlConnection::StartWorkerThread(asio::io_context *pIoCtx)
+    void IMySqlConnection::StartWorkerThread()
     {
-        // auto wg        = asio::make_work_guard(pIoCtx);
-        // _ioCtxWork     = std::make_unique<asio::io_context::work>(_ioCtx);
-        // asio::signal_set signal(*pIoCtx);
-        // signal.add(SIGABRT);
-        // signal.async_wait([this, pIoCtx](const std::error_code &errcode, int signal) {
-        //     Log::Debug("mysql connection signal:{}", signal);
-        //     pIoCtx->stop();
-        // });
-        _pWorkerThread = std::make_unique<std::thread>([pIoCtx] {
+        _ioWork        = asio::require(_ioCtx.get_executor(), asio::execution::outstanding_work.tracked);
+        _pWorkerThread = std::make_unique<std::thread>([this] {
             try
             {
-                //using namespace std::chrono_literals;
-                // _timer.expires_from_now(1s);
-                // _timer.async_wait([this](const std::error_code &errcode) {
-                //     Log::Debug("mysql timer running:{}", errcode.message());
-                // });
-                auto wg = asio::require(pIoCtx->get_executor(), asio::execution::outstanding_work.tracked);
                 Log::Debug("mysql running.....");
                 std::error_code errcode;
-                // _ioCtx.run();
-                pIoCtx->run();
+                _ioCtx.run();
                 if (errcode)
                 {
                     Log::Error("sql connection running failed:{}", errcode.message());
@@ -588,5 +558,35 @@ namespace Database
         fieldCount = mysql_stmt_field_count(pMySqlStmt);
 
         return true;
+    }
+
+    QueryResultFuture IMySqlConnection::AsyncQuery(std::string_view sql)
+    {
+        ++_asyncTaskCount;
+        return asio::post(_ioCtx.get_executor(), asio::use_future([this, sql]() -> QueryResultSetPtr {
+                              auto result = Query(sql);
+                              --_asyncTaskCount;
+                              return result;
+                          }));
+    }
+
+    PreparedQueryResultFuture IMySqlConnection::AsyncQuery(PreparedStatementBase *pStmt)
+    {
+        std::ostringstream ss;
+        ss << std::this_thread::get_id();
+        Log::Warn("IMySqlConnection::AsyncQuery:{}", ss.str());
+        ++_asyncTaskCount;
+
+        return asio::post(
+            _ioWork,
+            asio::use_future(
+                [this, p = std::shared_ptr<PreparedStatementBase>(pStmt)]() -> PreparedQueryResultSetPtr {
+                    std::ostringstream ss;
+                    ss << std::this_thread::get_id();
+                    Log::Warn("IMySqlConnection::AsyncQuery running:{}", ss.str());
+                    auto result = Query(p.get());
+                    --_asyncTaskCount;
+                    return result;
+                }));
     }
 } // namespace Database

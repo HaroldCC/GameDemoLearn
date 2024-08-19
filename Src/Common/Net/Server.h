@@ -38,7 +38,7 @@ namespace Net
         virtual void OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx) = 0;
 
     protected:
-        std::thread                                  _logicThread;
+        std::thread                                  _netThread;
         std::mutex                                   _mutex;
         Asio::io_context                             _netIoCtx;
         Asio::io_context                             _logicIoCtx;

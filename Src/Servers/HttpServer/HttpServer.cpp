@@ -32,7 +32,7 @@ void HttpServer::InitHttpRouter()
     _router.AddHttpHandler(
         Http::HttpMethod::Get,
         "/user1",
-        [](const Http::HttpRequest &request, Http::HttpResponse &resp) -> asio::awaitable<void> {
+        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) -> asio::awaitable<void> {
             auto data =
                 Database::g_LoginDatabaseStmts.find(Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
             if (data == Database::g_LoginDatabaseStmts.end())
@@ -45,8 +45,7 @@ void HttpServer::InitHttpRouter()
                 Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
             pStmt->SerialValue(data->second, "123456@qq.com");
 
-            Database::g_LoginDatabase.CoQuery(
-                pStmt,
+            auto callback = Database::g_LoginDatabase.AsyncQuery(pStmt).Then(
                 // R"(select id, name, email, age, intro from account where email="123456@qq.com")",
                 [&resp](Database::PreparedQueryResultSetPtr pResult) {
                     std::ostringstream ss;
@@ -76,10 +75,11 @@ void HttpServer::InitHttpRouter()
                     resp.SetStatusCode(Http::StatusCode::Ok);
                 });
 
+            _queryCallbackProcessor.AddCallback(std::move(callback));
+            std::this_thread::sleep_for(std::chrono::seconds(3));
             std::ostringstream ss;
             ss << std::this_thread::get_id();
             Log::Warn("-------------------------------:{}", ss.str());
-            std::this_thread::sleep_for(std::chrono::seconds(3));
         });
 
     _router.AddHttpHandler(
@@ -123,6 +123,18 @@ void HttpServer::InitHttpRouter()
 
             resp.SetStatusCode(Http::StatusCode::Ok);
         });
+
+    _router.AddHttpHandler(
+        Http::HttpMethod::Get,
+        "/task",
+        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) -> asio::awaitable<void> {
+            asio::post(_logicIoCtx, [&resp]() {
+                Log::Error("logic post task");
+                resp.SetContent(std::format("Hello post task"));
+                resp.SetStatusCode(Http::StatusCode::Ok);
+            });
+            co_return;
+        });
 }
 
 void HttpServer::OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx)
@@ -137,4 +149,6 @@ void HttpServer::OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogi
 void HttpServer::Update()
 {
     Net::IServer::Update();
+
+    _queryCallbackProcessor.ProcessReadyCallbacks();
 }

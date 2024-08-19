@@ -11,35 +11,36 @@
 
 #include <functional>
 
-#include <asio/awaitable.hpp>
-
 namespace Database
 {
 
-    QueryCallback::QueryCallback(QueryResultFuture &&result)
-        : _future(std::move(result))
-        , _isPreparedResult(false)
+    QueryCallback::QueryCallback(QueryResultFuture &&result) : _queryFuture(std::move(result))
     {
     }
 
-    QueryCallback::QueryCallback(PreparedQueryResultFuture &&result)
-        : _future(std::move(result))
-        , _isPreparedResult(true)
+    QueryCallback::QueryCallback(PreparedQueryResultFuture &&result) : _queryFuture(std::move(result))
     {
     }
 
     QueryCallback::QueryCallback(QueryCallback &&right) noexcept
+        : _queryFuture(std::move(right._queryFuture))
+        , _callbacks(std::move(right._callbacks))
     {
-        using std::swap;
-        swap(_future, right._future);
-        swap(_isPreparedResult, right._isPreparedResult);
+        //using std::swap;
+        //swap(_queryFuture, right._queryFuture);
+        //swap(_callbacks, right._callbacks);
     }
 
     QueryCallback &QueryCallback::operator=(QueryCallback &&right) noexcept
     {
-        using std::swap;
-        swap(_future, right._future);
-        swap(_isPreparedResult, right._isPreparedResult);
+        if (this != &right)
+        {
+            _queryFuture = std::move(right._queryFuture);
+            _callbacks   = std::move(right._callbacks);
+        }
+        // using std::swap;
+        // swap(_queryFuture, right._queryFuture);
+        // swap(_callbacks, right._callbacks);
         return *this;
     }
 
@@ -57,57 +58,43 @@ namespace Database
 
     bool QueryCallback::InvokeIfReady()
     {
-        QueryCallbackData &callback                    = _callbacks.front();
-        auto               checkStateAndReturnComplete = [this]() {
+        auto checkStateAndReturnComplete = [this]() {
             _callbacks.pop();
             bool bFinish = std::visit(
                 [](auto &&future) -> bool {
                     return future.valid();
                 },
-                _future);
+                _queryFuture);
 
             if (_callbacks.empty())
             {
-                Assert(!bFinish) return true;
+                Assert(!bFinish);
+                return true;
             }
 
+            if (!bFinish)
+            {
+                return true;
+            }
+
+            Assert(_queryFuture.index() == _callbacks.front().index());
             return false;
         };
 
-        if (_isPreparedResult)
-        {
-            PreparedQueryResultFuture *pFuture = std::get_if<PreparedQueryResultFuture>(&_future);
-            Assert(nullptr != pFuture);
-
-            if (pFuture->valid() && pFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-            {
-                PreparedQueryResultFuture future(std::move(*pFuture));
-                using CallbackType      = std::function<void(PreparedQueryResultSetPtr)>;
-                CallbackType *pCallback = std::get_if<CallbackType>(&callback._callback);
-                Assert(nullptr == pCallback);
-
-                (*pCallback)(future.get());
-                return checkStateAndReturnComplete();
-            }
-        }
-        else
-        {
-            QueryResultFuture *pFuture = std::get_if<QueryResultFuture>(&_future);
-            Assert(nullptr != pFuture);
-
-            if (pFuture->valid() && pFuture->wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-            {
-                QueryResultFuture future(std::move(*pFuture));
-                using CallbackType      = std::function<void(QueryResultSetPtr)>;
-                CallbackType *pCallback = std::get_if<CallbackType>(&callback._callback);
-                Assert(nullptr != pCallback);
-
-                (*pCallback)(future.get());
-                return checkStateAndReturnComplete();
-            }
-        }
-
-        return false;
+        return std::visit(
+            [&]<typename Result>(std::future<Result> &&future) {
+                using namespace std::chrono_literals;
+                if (future.valid() && future.wait_for(0s) == std::future_status::ready)
+                {
+                    std::future<Result>         f(std::move(future));
+                    std::function<void(Result)> cb(
+                        std::get<std::function<void(Result)>>(std::move(_callbacks.front())));
+                    cb(f.get());
+                    return checkStateAndReturnComplete();
+                }
+                return false;
+            },
+            std::move(_queryFuture));
     }
 
 } // namespace Database

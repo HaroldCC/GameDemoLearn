@@ -38,50 +38,13 @@ namespace Database
         bool InvokeIfReady();
 
     private:
-        std::variant<QueryResultFuture, PreparedQueryResultFuture> _future;
+        std::variant<QueryResultFuture, PreparedQueryResultFuture> _queryFuture;
         bool                                                       _isPreparedResult;
 
-        struct QueryCallbackData
-        {
-            QueryCallbackData(const QueryCallbackData &)            = delete;
-            QueryCallbackData &operator=(const QueryCallbackData &) = delete;
+        using QueryCallbackData = std::variant<std::function<void(QueryResultSetPtr)>,
+                                               std::function<void(PreparedQueryResultSetPtr)>>;
 
-            QueryCallbackData() = default;
-
-            explicit QueryCallbackData(std::function<void(QueryResultSetPtr)> &&callback)
-                : _callback(std::move(callback))
-                , _isPreparedResult(false)
-            {
-            }
-
-            explicit QueryCallbackData(std::function<void(PreparedQueryResultSetPtr)> &&callback)
-                : _callback(std::move(callback))
-                , _isPreparedResult(true)
-            {
-            }
-
-            QueryCallbackData(QueryCallbackData &&right) noexcept
-                : _callback(std::move(right._callback))
-                , _isPreparedResult(right._isPreparedResult)
-            {
-            }
-
-            QueryCallbackData &operator=(QueryCallbackData &&right) noexcept
-            {
-                using std::swap;
-                swap(_callback, right._callback);
-                swap(_isPreparedResult, right._isPreparedResult);
-
-                return *this;
-            }
-
-            std::variant<std::function<void(QueryResultSetPtr)>,
-                         std::function<void(PreparedQueryResultSetPtr)>>
-                 _callback;
-            bool _isPreparedResult;
-        };
-
-        std::queue<QueryCallbackData> _callbacks;
+        std::queue<QueryCallbackData, std::list<QueryCallbackData>> _callbacks;
     };
 
     using QueryCallbackProcessor = AsyncCallbackProcessor<QueryCallback>;

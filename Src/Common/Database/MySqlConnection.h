@@ -52,16 +52,14 @@ namespace Database
         bool Execute(std::string_view sql);
         bool Execute(PreparedStatementBase *pStmt);
 
+        void AsyncExecute(std::string_view sql);
+        void AsyncExecute(PreparedStatementBase *pStmt);
+
         QueryResultSetPtr         Query(std::string_view sql);
         PreparedQueryResultSetPtr Query(PreparedStatementBase *pStmt);
 
-        // asio::io_context &GetIoContext()
-        // {
-        //     return _ioCtx;
-        // }
-
-        asio::awaitable<QueryResultSetPtr>         CoQuery(std::string_view sql);
-        asio::awaitable<PreparedQueryResultSetPtr> CoQuery(PreparedStatementBase *pStmt);
+        QueryResultFuture         AsyncQuery(std::string_view sql);
+        PreparedQueryResultFuture AsyncQuery(PreparedStatementBase *pStmt);
 
         void BeginTransaction();
         void CommitTransaction();
@@ -71,11 +69,16 @@ namespace Database
 
         void Ping() const;
 
-        void StartWorkerThread(asio::io_context *pIoCtx);
+        void StartWorkerThread();
 
         std::thread::id GetWorkerThreadID() const
         {
             return _pWorkerThread->get_id();
+        }
+
+        std::size_t GetAsyncTaskCount() const
+        {
+            return _asyncTaskCount;
         }
 
     protected:
@@ -84,22 +87,6 @@ namespace Database
         MySqlPreparedStatement *GetPrepareStatement(uint32_t index);
 
         bool HandleMySqlErrcode(uint32_t errcode, uint8_t tryReconnectTimes = 5);
-
-        void Lock()
-        {
-            //     _mutex.lock();
-        }
-
-        bool TryLock()
-        {
-            //     return _mutex.try_lock();
-            return true;
-        }
-
-        void UnLock()
-        {
-            //     _mutex.unlock();
-        }
 
         bool Query(std::string_view sql,
                    MySqlResult    *&pResult,
@@ -112,21 +99,37 @@ namespace Database
                    uint64_t                &rowCount,
                    uint32_t                &fieldCount);
 
+        void Lock()
+        {
+            _mutex.lock();
+        }
+
+        bool TryLock()
+        {
+            return _mutex.try_lock();
+        }
+
+        void UnLock()
+        {
+            _mutex.unlock();
+        }
+
     protected:
         using PreparedStatementContainer = std::vector<std::unique_ptr<MySqlPreparedStatement>>;
         PreparedStatementContainer _stmts;
         bool                       _bReconnecting {false};
         bool                       _bPrepareError {false};
 
+        bool Update();
+
     private:
         std::unique_ptr<std::thread> _pWorkerThread;
         MySqlHandle                 *_pMysqlHandle {nullptr};
         MySqlConnectionInfo         &_connectInfo;
         MySqlConnectionType          _mysqlConnType;
-        // asio::io_context             _ioCtx;
-        // asio::steady_timer           _timer;
-        // asio::executor_work_guard<asio::io_context::executor_type> _workGrard;
-        // std::unique_ptr<asio::io_context::work> _ioCtxWork;
-        // mutable std::mutex                      _mutex;
+        asio::io_context             _ioCtx;
+        asio::any_io_executor        _ioWork;
+        std::size_t                  _asyncTaskCount = 0;
+        std::mutex                   _mutex;
     };
 } // namespace Database

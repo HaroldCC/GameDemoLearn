@@ -7,16 +7,17 @@ int main()
 {
     Log::CLogger::GetLogger().InitLogger("log/HttpServer.html", 0, 10240, 10);
 
-    Database::g_LoginDatabase.Open({"root", "cr11234", "test", "127.0.0.1", "3306"}, 1, 1);
-    Database::g_LoginDatabase.PrepareStatements();
 
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    // std::this_thread::sleep_for(std::chrono::seconds(3));
 
     try
     {
         // auto pHttpServer = std::make_shared<HttpServer>("127.0.0.1", 10007);
         // pHttpServer->Start();
         HttpServer server("127.0.0.1", 10007);
+
+    Database::g_LoginDatabase.Open({"root", "cr11234", "test", "127.0.0.1", "3306"}, 1, 1);
+    Database::g_LoginDatabase.PrepareStatements();
 
         server.Start();
     }

@@ -25,31 +25,27 @@ namespace Net
     IServer::~IServer()
     {
         Log::Debug("~IServer");
-        if (_logicThread.joinable())
+        if (_netThread.joinable())
         {
-            _logicThread.join();
+            _netThread.join();
         }
     }
 
     void IServer::Start()
     {
-        // 启动逻辑线程
-        // auto self(shared_from_this());
-        _logicThread = std::thread([this]() {
+        _netThread = std::thread([this]() {
+            // 启动网络协程
             try
             {
-                using namespace std::chrono_literals;
-                _updateTimer.expires_from_now(1ms);
-                _updateTimer.async_wait([this](const std::error_code &errcode) {
-                    Update();
+                // _signals.add(SIGINT);
+                _signals.add(SIGTERM);
+                _signals.async_wait([this](const std::error_code &errcode, int signal) {
+                    Log::Debug("signal:{}", signal);
+                    _netIoCtx.stop();
                 });
-                std::stringstream ss;
-                ss << std::this_thread::get_id();
-                Log::Debug("逻辑线程启动：{}", ss.str());
-                // auto wg =
-                //     asio::require(_logicIoCtx.get_executor(), asio::execution::outstanding_work.tracked);
-                _logicIoCtx.run();
-                Log::Debug("logic thread stoping.....");
+
+                Asio::co_spawn(_netIoCtx, AcceptLoop(), asio::detached);
+                _netIoCtx.run();
             }
             catch (const std::exception &e)
             {
@@ -60,19 +56,22 @@ namespace Net
                 Log::Critical("服务器未知异常！！！");
             }
         });
-
-        // 启动网络协程
+        
+        // 启动逻辑线程
         try
         {
-            // _signals.add(SIGINT);
-            _signals.add(SIGTERM);
-            _signals.async_wait([this](const std::error_code &errcode, int signal) {
-                Log::Debug("signal:{}", signal);
-                _netIoCtx.stop();
+            using namespace std::chrono_literals;
+            _updateTimer.expires_from_now(1ms);
+            _updateTimer.async_wait([this](const std::error_code &errcode) {
+                Update();
             });
-
-            Asio::co_spawn(_netIoCtx, AcceptLoop(), asio::detached);
-            _netIoCtx.run();
+            std::stringstream ss;
+            ss << std::this_thread::get_id();
+            Log::Debug("逻辑线程启动：{}", ss.str());
+            // auto wg =
+            //     asio::require(_logicIoCtx.get_executor(), asio::execution::outstanding_work.tracked);
+            _logicIoCtx.run();
+            Log::Debug("logic thread stoping.....");
         }
         catch (const std::exception &e)
         {

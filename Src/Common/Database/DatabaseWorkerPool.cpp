@@ -37,9 +37,6 @@ namespace Database
                   _syncThreadCount,
                   _asyncThreadCount);
 
-        // _ioContext = std::make_unique<asio::io_context(_asyncThreadCount);
-        _pIoCtx = std::make_unique<asio::io_context>(_asyncThreadCount);
-
         uint32_t errcode = OpenConnections(EConnectionTypeIndex_Async, _asyncThreadCount);
         if (0 != errcode)
         {
@@ -54,12 +51,8 @@ namespace Database
 
         for (const auto &pConnection : _typeConnections[EConnectionTypeIndex_Async])
         {
-            // std::unique_ptr<asio::io_context> pIoCtx = std::make_unique<asio::io_context>(1);
-            // std::unique_ptr<asio::io_context::work> pIoCtxWork =
-            //     std::make_unique<asio::io_context::work>(*pIoCtx);
-            pConnection->StartWorkerThread(_pIoCtx.get());
-            // _ioContexts.emplace_back(std::move(pIoCtx));
-            // _ioCtxWorks.emplace_back(std::move(pIoCtxWork));
+            //std::unique_ptr<asio::io_context> pIoCtx = std::make_unique<asio::io_context>(1);
+            pConnection->StartWorkerThread();
         }
 
         Log::Info("数据库工作池连接成功：{} 当前连接数：{}",
@@ -74,18 +67,9 @@ namespace Database
     {
         Log::Info("关闭数据库工作池：{}", _pConnectionInfo->database);
 
-        // _ioContext->stop();
-
         _typeConnections[EConnectionTypeIndex_Async].clear();
-        // _ioContext->reset();
 
         _typeConnections[EConnectionTypeIndex_Sync].clear();
-
-        // for (auto &&pWork : _ioCtxWorks)
-        // {
-        //     pWork->get_io_context().stop();
-        //     pWork.reset();
-        // }
     }
 
     template <typename ConnectionType>
@@ -139,18 +123,7 @@ namespace Database
             return;
         }
 
-        // asio::post(_ioContext->get_executor(), [this, sql] {
-        //     for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-        //     {
-        //         if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-        //         {
-        //             return pConnection->Execute(sql);
-        //         }
-        //     }
-
-        //     Log::Critical("执行sql语句:{}, 错误，找不到对应连接的工作线程", sql);
-        //     return false;
-        // });
+        GetFreeAsyncConnection()->AsyncExecute(sql);
     }
 
     template <typename ConnectionType>
@@ -160,19 +133,7 @@ namespace Database
         {
             return;
         }
-
-        // asio::post(_ioContext->get_executor(), [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)] {
-        //     for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-        //     {
-        //         if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-        //         {
-        //             return pConnection->Execute(pStmt.get());
-        //         }
-        //     }
-
-        //     Log::Critical("执行预处理sql语句:{}, 错误，找不到对应连接的工作线程", pStmt->GetIndex());
-        //     return false;
-        // });
+        GetFreeAsyncConnection()->AsyncExecute(pStmt);
     }
 
     template <typename ConnectionType>
@@ -204,117 +165,13 @@ namespace Database
     template <typename ConnectionType>
     QueryCallback DatabaseWorkerPool<ConnectionType>::AsyncQuery(std::string_view sql)
     {
-        // QueryResultFuture result =
-        //     asio::post(_ioContext->get_executor(), asio::use_future([this, sql]() -> QueryResultSetPtr {
-        //                    for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-        //                    {
-        //                        if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-        //                        {
-        //                            return pConnection->Query(sql);
-        //                        }
-        //                    }
-
-        //                    Log::Critical("执行sql语句:{}, 错误，找不到对应连接的工作线程", sql);
-        //                    return nullptr;
-        //                }));
-
-        // return QueryCallback(std::move(result));
-        return QueryCallback(QueryResultFuture());
+        return QueryCallback(GetFreeAsyncConnection()->AsyncQuery(sql));
     }
 
     template <typename ConnectionType>
     QueryCallback DatabaseWorkerPool<ConnectionType>::AsyncQuery(PreparedStatementBase *pStmt)
     {
-        // PreparedQueryResultFuture result = asio::post(
-        //     _ioContext->get_executor(),
-        //     asio::use_future(
-        //         [this, pStmt = std::unique_ptr<PreparedStatementBase>(pStmt)]() -> PreparedQueryResultSetPtr {
-        //             for (auto &&pConnection : _typeConnections[EConnectionTypeIndex_Async])
-        //             {
-        //                 if (pConnection->GetWorkerThreadID() == std::this_thread::get_id())
-        //                 {
-        //                     return pConnection->Query(pStmt.get());
-        //                 }
-        //             }
-
-        //             Log::Critical("执行预处理sql语句:{}, 错误，找不到对应连接的工作线程", pStmt->GetIndex());
-        //             return nullptr;
-        //         }));
-
-        // return QueryCallback(std::move(result));
-        return QueryCallback(QueryResultFuture());
-    }
-
-    template <typename ConnectionType>
-    void DatabaseWorkerPool<ConnectionType>::CoQuery(std::string_view                         sql,
-                                                     std::function<void(QueryResultSetPtr)> &&f)
-    {
-        Log::Debug("database pool sql:{}", sql);
-        auto pConnection = GetFreeConnectionAndLock();
-        asio::co_spawn(_pIoCtx->get_executor(),
-                       pConnection->CoQuery(sql),
-                       [f](std::exception_ptr ex, QueryResultSetPtr pResult) {
-                           f(pResult);
-                           Log::Debug("==================result");
-                       });
-        pConnection->UnLock();
-    }
-
-    template <typename ConnectionType>
-    void DatabaseWorkerPool<ConnectionType>::CoQuery(PreparedStatementBase                           *pStmt,
-                                                     std::function<void(PreparedQueryResultSetPtr)> &&f)
-    {
-        if (nullptr == pStmt)
-        {
-            return;
-        }
-
-        auto *pVector = new std::vector<std::function<void(PreparedQueryResultSetPtr)>>();
-        pVector->emplace_back(f);
-
-        auto pConnection = GetFreeConnectionAndLock();
-        // auto co          = pConnection->CoQuery(pStmt);
-
-        std::ostringstream ss;
-        ss << std::this_thread::get_id();
-        Log::Error("=======begin query:{}", ss.str());
-        asio::co_spawn(_pIoCtx->get_executor(),
-                       DatabaseWorkerPool<ConnectionType>::CoQueryImpl(pConnection.get(), pStmt, pVector),
-                       asio::detached);
-        //    [f = std::move(f)](PreparedQueryResultSetPtr pResult) mutable {
-        //        f(pResult);
-        //        Log::Debug("==================result");
-        //    });
-        Log::Info("end coQuery");
-        pConnection->UnLock();
-    }
-
-    template <typename ConnectionType>
-    asio::awaitable<void> DatabaseWorkerPool<ConnectionType>::CoQueryImpl(
-        IMySqlConnection                                            *pConnection,
-        PreparedStatementBase                                       *pStmt,
-        std::vector<std::function<void(PreparedQueryResultSetPtr)>> *f)
-    {
-        std::ostringstream ss;
-        ss << std::this_thread::get_id();
-        Log::Error("co queryImpl --------------{}", ss.str());
-        auto pResult = co_await pConnection->CoQuery(pStmt);
-        if (pResult == nullptr)
-        {
-            Log::Warn("CoQueryImpl empty result");
-            co_return;
-        }
-
-        Database::Field *pFields = pResult->Fetch();
-        uint32_t         id      = pFields[0];
-        const char      *strName = pFields[1];
-        const char      *email   = pFields[2];
-        uint32_t         age     = pFields[3];
-        std::string      intro   = pFields[4];
-
-        Log::Debug("id:{}, email:{}, name:{}, age:{}, intro:{}", id, email, strName, age, intro);
-
-        (*f)[0](pResult);
+        return QueryCallback(std::move(GetFreeAsyncConnection()->AsyncQuery(pStmt)));
     }
 
     template <typename ConnectionType>
@@ -390,6 +247,21 @@ namespace Database
         }
 
         return pConnection;
+    }
+
+    template <typename ConnectionType>
+    std::shared_ptr<ConnectionType> DatabaseWorkerPool<ConnectionType>::GetFreeAsyncConnection()
+    {
+        auto connections = _typeConnections[EConnectionTypeIndex_Async];
+        std::make_heap(
+            connections.begin(),
+            connections.end(),
+            [](const std::shared_ptr<ConnectionType> lhs, const std::shared_ptr<ConnectionType> rhs) {
+                return lhs->GetAsyncTaskCount() < rhs->GetAsyncTaskCount();
+            });
+        std::pop_heap(connections.begin(), connections.end());
+
+        return connections.back();
     }
 
     template <typename ConnectionType>
