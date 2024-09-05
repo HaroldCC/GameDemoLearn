@@ -4,6 +4,19 @@ rule("3rdPartyRule")
     end)
 rule_end()
 
+target("angelscript") do
+	set_kind("static")
+
+    add_rules("3rdPartyRule")
+    set_group("3rdParty")
+
+	add_headerfiles("angelscript/include/angelscript.h")
+	add_headerfiles("angelscript/source/*.h", "angelscript/add_on/**.h")
+	add_files("angelscript/source/*.cpp", "angelscript/source/as_callfunc_x64_msvc_asm.asm", "angelscript/add_on/**.cpp")
+
+    add_includedirs("angelscript/include", "angelscript/add_on/", {public=true})
+end
+
 target("asio")
     set_kind("static")
     add_rules("3rdPartyRule")
