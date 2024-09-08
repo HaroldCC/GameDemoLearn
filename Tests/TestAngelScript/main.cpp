@@ -169,7 +169,7 @@ void DumpEnums(asIScriptEngine *pEngine)
         return;
     }
 
-    std::string_view strEnumInfo;
+    std::string strEnumInfo;
     for (int i = 0; i < pEngine->GetEnumCount(); ++i)
     {
         asITypeInfo *pEnum = pEngine->GetEnumByIndex(i);
@@ -181,23 +181,23 @@ void DumpEnums(asIScriptEngine *pEngine)
         std::string_view strNameSpace = pEnum->GetNamespace();
         if (!strNameSpace.empty())
         {
-            strEnumInfo = std::format("namespace {} {{\n", strNameSpace);
+            strEnumInfo.append(std::format("namespace {} {{\n", strNameSpace));
         }
 
-        strEnumInfo = std::format("{}enum {} {{\n", strEnumInfo, pEnum->GetName());
+        strEnumInfo.append(std::format("enum {} {{\n", pEnum->GetName()));
         for (int j = 0; j < pEnum->GetEnumValueCount(); ++j)
         {
-            strEnumInfo = std::format("{}   {}", strEnumInfo, pEnum->GetEnumValueByIndex(j, nullptr));
+            strEnumInfo.append(std::format("   {}", pEnum->GetEnumValueByIndex(j, nullptr)));
             if (j < pEnum->GetEnumValueCount() - 1)
             {
-                strEnumInfo = std::format("{},", strEnumInfo);
+                strEnumInfo.append(",");
             }
-            strEnumInfo = std::format("{}\n", strEnumInfo);
+            strEnumInfo.append("\n");
         }
-        strEnumInfo = std::format("{}}}\n", strEnumInfo);
+        strEnumInfo.append("}\n");
         if (!strNameSpace.empty())
         {
-            strEnumInfo = std::format("{}}}\n", strEnumInfo);
+            strEnumInfo.append("}\n");
         }
     }
 
@@ -273,8 +273,8 @@ void DumpClasses(asIScriptEngine *pEngine)
                 continue;
             }
 
-            strClassInfo.append(std::format("    funcdef {};\n",
-                                            p->GetFuncdefSignature()->GetDeclaration(false, true, true)));
+            strClassInfo.append(
+                std::format("    funcdef {};\n", p->GetFuncdefSignature()->GetDeclaration(false)));
         }
         strClassInfo.append("}\n");
         if (!strNameSpace.empty())
@@ -288,12 +288,108 @@ void DumpClasses(asIScriptEngine *pEngine)
 
 void DumpGlobalFunctions(asIScriptEngine *pEngine)
 {
+    if (nullptr == pEngine)
+    {
+        return;
+    }
+
+    std::string strGlobalFuncInfo;
+    for (int i = 0; i < pEngine->GetGlobalFunctionCount(); ++i)
+    {
+        asIScriptFunction *pGlobalFun = pEngine->GetGlobalFunctionByIndex(i);
+        if (nullptr == pGlobalFun)
+        {
+            continue;
+        }
+
+        std::string_view strNameSpace = pGlobalFun->GetNamespace();
+        if (!strNameSpace.empty())
+        {
+            strGlobalFuncInfo.append(std::format("namespace {} {{\n", strNameSpace));
+        }
+        strGlobalFuncInfo.append(std::format("{};", pGlobalFun->GetDeclaration(false, false, true)));
+
+        if (!strNameSpace.empty())
+        {
+            strGlobalFuncInfo.append("}");
+        }
+
+        strGlobalFuncInfo.append("\n");
+    }
+
+    WriteToFile(strGlobalFuncInfo);
 }
 
 void DumpGlobalProperty(asIScriptEngine *pEngine)
 {
+    if (nullptr == pEngine)
+    {
+        return;
+    }
+
+    std::string strGlobalVaribal;
+    for (int i = 0; i < pEngine->GetGlobalPropertyCount(); ++i)
+    {
+        const char *pName;
+        const char *pNameSpace;
+        int         type;
+        pEngine->GetGlobalPropertyByIndex(i, &pName, &pNameSpace, &type);
+        std::string_view strDecl = pEngine->GetTypeDeclaration(type, true);
+        if (strDecl.empty())
+        {
+            continue;
+        }
+
+        std::string_view strName(pName);
+        std::string_view strNameSpace(pNameSpace);
+        if (!strNameSpace.empty())
+        {
+            strGlobalVaribal.append(std::format("namespace {} {{", strNameSpace));
+        }
+
+        strGlobalVaribal.append(std::format("{} {};", strDecl, strName));
+        if (!strNameSpace.empty())
+        {
+            strGlobalVaribal.append(" }");
+        }
+
+        strGlobalVaribal.append("\n");
+    }
+
+    WriteToFile(strGlobalVaribal);
 }
 
 void DumpGlobalTypedefs(asIScriptEngine *pEngine)
 {
+    if (nullptr == pEngine)
+    {
+        return;
+    }
+
+    std::string strGlobalTypeDefs;
+
+    for (int i = 0; i < pEngine->GetTypedefCount(); ++i)
+    {
+        asITypeInfo *pTypeInfo = pEngine->GetTypedefByIndex(i);
+        if (nullptr == pTypeInfo)
+        {
+            continue;
+        }
+
+        const std::string_view ns = pTypeInfo->GetNamespace();
+        if (!ns.empty())
+        {
+            strGlobalTypeDefs.append(std::format("namespace {} {{\n", ns));
+        }
+
+        strGlobalTypeDefs.append(std::format("typedef {} {};\n",
+                                             pEngine->GetTypeDeclaration(pTypeInfo->GetTypedefTypeId()),
+                                             pTypeInfo->GetName()));
+        if (!ns.empty())
+        {
+            strGlobalTypeDefs.append("}\n");
+        }
+    }
+
+    WriteToFile(strGlobalTypeDefs);
 }

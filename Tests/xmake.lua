@@ -39,3 +39,5 @@ target("TestClient")
     add_rules("CommonRule", "TestRule")
     add_files("testClient.cpp")
     add_includedirs("$(projectdir)/3rdParty/async_simple")
+
+includes("TestAngelScript")
