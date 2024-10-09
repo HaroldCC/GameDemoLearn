@@ -5,19 +5,21 @@
 
 int main()
 {
-    Log::CLogger::GetLogger().InitLogger("log/HttpServer.html", 0, 10240, 10);
+    auto logDir = std::filesystem::current_path() / "log";
+    if (!std::filesystem::exists(logDir))
+    {
+        std::filesystem::create_directories(logDir);
+    }
+    auto strLogFile = std::format("{}/HttpServer.html", logDir.string());
 
+    Log::CLogger::GetLogger().InitLogger(strLogFile, 0, 10240, 10);
 
-    // std::this_thread::sleep_for(std::chrono::seconds(3));
+    Database::g_LoginDatabase.Open({"root", "cr11234", "test", "127.0.0.1", "3306"}, 2, 2);
+    Database::g_LoginDatabase.PrepareStatements();
 
     try
     {
-        // auto pHttpServer = std::make_shared<HttpServer>("127.0.0.1", 10007);
-        // pHttpServer->Start();
         HttpServer server("127.0.0.1", 10007);
-
-    Database::g_LoginDatabase.Open({"root", "cr11234", "test", "127.0.0.1", "3306"}, 1, 1);
-    Database::g_LoginDatabase.PrepareStatements();
 
         server.Start();
     }

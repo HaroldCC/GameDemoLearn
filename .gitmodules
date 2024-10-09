@@ -10,3 +10,6 @@
 [submodule "3rdParty/magic_enum"]
 	path = 3rdParty/magic_enum
 	url = https://github.com/Neargye/magic_enum.git
+[submodule "3rdParty/asbind20"]
+	path = 3rdParty/asbind20
+	url = https://github.com/HenryAWE/asbind20.git

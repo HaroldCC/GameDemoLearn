@@ -17,6 +17,19 @@ target("angelscript") do
     add_includedirs("angelscript/include", "angelscript/add_on/", {public=true})
 end
 
+target("asbind") do
+    set_kind("static")
+
+    add_rules("3rdPartyRule")
+    set_group("3rdParty")
+
+    add_headerfiles("asbind20/include/**.hpp")
+    add_files("asbind20/src/**.cpp")
+
+    add_includedirs("asbind20/include", {public=true})
+    add_deps("angelscript")
+end
+
 target("asio")
     set_kind("static")
     add_rules("3rdPartyRule")

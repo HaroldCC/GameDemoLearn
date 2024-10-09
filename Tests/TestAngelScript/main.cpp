@@ -226,7 +226,7 @@ void DumpClasses(asIScriptEngine *pEngine)
             strClassInfo.append(std::format("\nnamespace {} {{\n", strNameSpace));
         }
 
-        strClassInfo.append(std::format("\nclass {}\n", pClassType->GetName()));
+        strClassInfo.append(std::format("\nclass {}", pClassType->GetName()));
         if (pClassType->GetSubTypeCount())
         {
             strClassInfo.append("<");
@@ -244,7 +244,7 @@ void DumpClasses(asIScriptEngine *pEngine)
             strClassInfo.append(">");
         }
 
-        strClassInfo.append("{\n");
+        strClassInfo.append("\n{\n");
 
         for (int j = 0; j < pClassType->GetBehaviourCount(); ++j)
         {
