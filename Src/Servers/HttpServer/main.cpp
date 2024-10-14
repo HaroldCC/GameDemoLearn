@@ -2,10 +2,11 @@
 #include "Common/Util/Log.h"
 
 #include "Common/Database/DatabaseImpl/LoginDatabase.h"
+#include "Common/Util/Util.h"
 
 int main()
 {
-    auto logDir = std::filesystem::current_path() / "log";
+    auto logDir = Util::GetExecutableDirectoryPath() / "log";
     if (!std::filesystem::exists(logDir))
     {
         std::filesystem::create_directories(logDir);
@@ -14,7 +15,7 @@ int main()
 
     Log::CLogger::GetLogger().InitLogger(strLogFile, 0, 10240, 10);
 
-    Database::g_LoginDatabase.Open({"root", "cr11234", "test", "127.0.0.1", "3306"}, 2, 2);
+    Database::g_LoginDatabase.Open({"root", "cr11234", "test", "127.0.0.1", "3306"}, 1, 1);
     Database::g_LoginDatabase.PrepareStatements();
 
     try

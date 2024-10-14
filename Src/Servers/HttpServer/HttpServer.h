@@ -19,17 +19,12 @@ public:
 
     void InitHttpRouter();
 
-    const asio::io_context &GetCtx() const
-    {
-        return _logicIoCtx;
-    }
-
 protected:
     void Update() override;
-
-    void OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx) override;
+    std::shared_ptr<Net::ISession> CreateSession(Asio::socket&& socket) override;
+    void OnSessionCreated(std::shared_ptr<Net::ISession> pSession) override;
 
 private:
     Database::QueryCallbackProcessor _queryCallbackProcessor;
-    Http::HttpRouter                 _router;
+    Http::HttpRouter _router;
 };

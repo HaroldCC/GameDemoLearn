@@ -32,13 +32,13 @@ void HttpServer::InitHttpRouter()
     _router.AddHttpHandler(
         Http::HttpMethod::Get,
         "/user1",
-        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) -> asio::awaitable<void> {
+        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) -> void {
             auto data =
                 Database::g_LoginDatabaseStmts.find(Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
             if (data == Database::g_LoginDatabaseStmts.end())
             {
                 resp.SetStatusCode(Http::StatusCode::InternalServerError);
-                co_return;
+                return;
             }
             Log::Debug("/user request");
             Database::PreparedStatementBase *pStmt = Database::g_LoginDatabase.GetPrepareStatement(
@@ -85,13 +85,13 @@ void HttpServer::InitHttpRouter()
     _router.AddHttpHandler(
         Http::HttpMethod::Get,
         "/user2",
-        [](const Http::HttpRequest &request, Http::HttpResponse &resp) -> asio::awaitable<void> {
+        [](const Http::HttpRequest &request, Http::HttpResponse &resp) -> void {
             auto data =
                 Database::g_LoginDatabaseStmts.find(Database::LoginDatabaseSqlID::LOGIN_SEL_ACCOUNT_BY_EMAIL);
             if (data == Database::g_LoginDatabaseStmts.end())
             {
                 resp.SetStatusCode(Http::StatusCode::InternalServerError);
-                co_return;
+                return;
             }
             Log::Debug("/user2 request");
 
@@ -107,7 +107,7 @@ void HttpServer::InitHttpRouter()
             if (pResult == nullptr)
             {
                 resp.SetStatusCode(Http::StatusCode::InternalServerError);
-                co_return;
+                return;
             }
 
             Database::Field *pFields = pResult->Fetch();
@@ -124,31 +124,30 @@ void HttpServer::InitHttpRouter()
             resp.SetStatusCode(Http::StatusCode::Ok);
         });
 
-    _router.AddHttpHandler(
-        Http::HttpMethod::Get,
-        "/task",
-        [this](const Http::HttpRequest &request, Http::HttpResponse &resp) -> asio::awaitable<void> {
-            asio::post(_logicIoCtx, [&resp]() {
-                Log::Error("logic post task");
-                resp.SetContent(std::format("Hello post task"));
-                resp.SetStatusCode(Http::StatusCode::Ok);
-            });
-            co_return;
-        });
-}
-
-void HttpServer::OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx)
-{
-    auto pSession = std::make_shared<Http::HttpSession>(std::move(socket), pLogicIOCtx);
-    pSession->SetRouter(_router);
-    pSession->StartSession();
-
-    AddNewSession(pSession);
+    _router.AddHttpHandler(Http::HttpMethod::Get,
+                           "/task",
+                           [this](const Http::HttpRequest &request, Http::HttpResponse &resp) -> void {
+                               asio::post(_logicIoCtx, [&resp]() {
+                                   Log::Error("logic post task");
+                                   resp.SetContent(std::format("Hello post task"));
+                                   resp.SetStatusCode(Http::StatusCode::Ok);
+                               });
+                           });
 }
 
 void HttpServer::Update()
 {
     Net::IServer::Update();
-
     _queryCallbackProcessor.ProcessReadyCallbacks();
+}
+
+std::shared_ptr<Net::ISession> HttpServer::CreateSession(Asio::socket &&socket)
+{
+    return std::make_shared<Http::HttpSession>(std::move(socket));
+}
+
+void HttpServer::OnSessionCreated(std::shared_ptr<Net::ISession> pSession)
+{
+    auto httpSession = std::static_pointer_cast<Http::HttpSession>(pSession);
+    httpSession->SetRouter(_router);
 }

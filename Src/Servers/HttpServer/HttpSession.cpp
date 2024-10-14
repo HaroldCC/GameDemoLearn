@@ -11,41 +11,28 @@
 
 namespace Http
 {
-    void HttpSession::SetRouter(HttpRouter &router)
+    HttpSession::HttpSession(Asio::socket&& socket)
+        : Net::ISession(std::move(socket))
+    {
+    }
+
+    void HttpSession::SetRouter(const HttpRouter& router)
     {
         _router = router;
     }
 
-    void HttpSession::ReadHandler()
+    void HttpSession::OnMessageReceived(Net::MessageBuffer& buffer)
     {
-        asio::co_spawn(_pLogicIOCtx->get_executor(), CoReadHandler(), asio::detached);
-    }
-
-    asio::awaitable<void> HttpSession::CoReadHandler()
-    {
-        Net::MessageBuffer packet;
-        if (!_readBufferQueue.Pop(packet))
-        {
-            co_return;
-        }
-
-        if (packet.ReadableBytes() <= 0)
-        {
-            co_return;
-        }
-
-        const std::string &content = packet.ReadAllAsString();
+        const std::string &content = buffer.ReadAllAsString();
         if (!content.empty())
         {
-            // Log::Info("Http:{}", content);
             _req.Parse(content);
-            co_await _router.Route(_req, _rep);
+            _router.Route(_req, _rep);
 
-            std::string_view   response = _rep.GetPayload();
+            std::string_view response = _rep.GetPayload();
             Net::MessageBuffer sendBuffer(response.size());
             sendBuffer.Write(response);
-            SendMsg(std::move(sendBuffer));
-            // SendProtoMessage((uint32_t)response.size(), response.data());
+            SendMessage(std::move(sendBuffer));
         }
         else
         {

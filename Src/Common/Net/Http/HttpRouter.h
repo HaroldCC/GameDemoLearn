@@ -19,12 +19,12 @@
 
 namespace Http
 {
-    using HttpHandlerFunc = std::function<asio::awaitable<void>(const HttpRequest &, HttpResponse &)>;
+    using HttpHandlerFunc = std::function<void(const HttpRequest &, HttpResponse &)>;
 
     class HttpRouter final
     {
     public:
-        asio::awaitable<void> Route(const HttpRequest &req, HttpResponse &resp);
+        void Route(const HttpRequest &req, HttpResponse &resp);
 
         /**
          * @brief 添加Http处理函数  eg: GET hello/    POST hello/ 作为key

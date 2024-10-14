@@ -9,6 +9,7 @@
 #pragma once
 
 #include "Assert.h"
+#include "Platform.h"
 
 #include <type_traits>
 #include <string_view>
@@ -251,5 +252,25 @@ namespace Util
             return detail::For<std::decay_t<Type>>::ToString(std::forward<Type>(val),
                                                              std::forward<Params>(params)...);
         }
+    }
+
+    inline std::filesystem::path GetExecutableDirectoryPath()
+    {
+#ifdef OS_PLATFORM_WINDOWS
+        wchar_t path[MAX_PATH];
+        if (GetModuleFileNameW(nullptr, path, MAX_PATH) == 0)
+        {
+            return {}; // 返回空路径表示失败
+        }
+#else
+        char    path[PATH_MAX];
+        ssize_t count = readlink("/proc/self/exe", path, PATH_MAX);
+        if (count <= 0 || count >= PATH_MAX)
+        {
+            return {}; // 返回空路径表示失败
+        }
+        path[count] = '\0';
+#endif
+        return std::filesystem::path(path).parent_path();
     }
 } // namespace Util

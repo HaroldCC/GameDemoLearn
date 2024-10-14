@@ -8,12 +8,10 @@
 ************************************************************************/
 #pragma once
 #include "Asio.h"
+#include "Session.h"
 
 namespace Net
 {
-
-    class ISession;
-
     class IServer
     {
     public:
@@ -27,15 +25,17 @@ namespace Net
         virtual ~IServer();
 
         void Start();
+        virtual void Stop();
 
     protected:
-        virtual void Update() = 0;
-
+        virtual void Update();
+        virtual std::shared_ptr<ISession> CreateSession(Asio::socket&& socket) = 0;
+        
         asio::awaitable<void> AcceptLoop();
+        void AddNewSession(std::shared_ptr<ISession> pNewSession);
+        void RemoveSession(std::shared_ptr<ISession> pSession);
 
-        virtual void AddNewSession(std::shared_ptr<ISession> pNewSession);
-
-        virtual void OnScoketAccepted(Asio::socket &&socket, asio::io_context *pLogicIOCtx) = 0;
+        virtual void OnSessionCreated(std::shared_ptr<ISession> pSession) {}
 
     protected:
         std::thread                                  _netThread;
@@ -46,6 +46,6 @@ namespace Net
         Asio::endpoint                               _listenEndPoint;
         Asio::acceptor                               _acceptor;
         Asio::steady_timer                           _updateTimer;
-        std::vector<std::shared_ptr<class ISession>> _sessions;
+        std::vector<std::shared_ptr<ISession>>      _sessions;
     };
 } // namespace Net

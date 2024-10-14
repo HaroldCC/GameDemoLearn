@@ -13,12 +13,11 @@
 
 namespace Net
 {
-    ISession::ISession(asio::ip::tcp::socket &&socket, asio::io_context *pLogicIOCtx)
+    ISession::ISession(asio::ip::tcp::socket &&socket)
         : _socket(std::move(socket))
         , _remoteAddress(_socket.remote_endpoint().address())
         , _timer(_socket.get_executor())
         , _remotePort(_socket.remote_endpoint().port())
-        , _pLogicIOCtx(pLogicIOCtx)
         , _closed(false)
         , _closing(false)
     {
@@ -42,20 +41,6 @@ namespace Net
         asio::co_spawn(_socket.get_executor(), WriteLoop(), asio::detached);
     }
 
-    void ISession::SendProtoMessage(size_t header, const std::string &message)
-    {
-    }
-
-    void ISession::SendMsg(const MessageBuffer &message)
-    {
-        if (message.ReadableBytes() <= 0)
-        {
-            return;
-        }
-
-        _writeBufferQueue.Push(message);
-        _timer.cancel_one();
-    }
 
     void ISession::CloseSession()
     {
@@ -73,6 +58,27 @@ namespace Net
                        error.value(),
                        error.message());
         }
+    }
+
+    bool ISession::Update()
+    {
+        MessageBuffer buffer;
+        while (_readBufferQueue.Pop(buffer))
+        {
+            OnMessageReceived(buffer);
+        }
+        return !_closed;
+    }
+
+    void ISession::SendMessage(const MessageBuffer &message)
+    {
+        if (message.ReadableBytes() <= 0)
+        {
+            return;
+        }
+
+        _writeBufferQueue.Push(message);
+        _timer.cancel_one();
     }
 
     asio::awaitable<void> ISession::ReadLoop()

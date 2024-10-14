@@ -83,6 +83,13 @@ namespace Net
         }
     }
 
+    void IServer::Stop()
+    {
+        // 实现停止服务器的逻辑
+        _netIoCtx.stop();
+        _logicIoCtx.stop();
+    }
+
     void IServer::Update()
     {
         using namespace std::chrono_literals;
@@ -121,7 +128,10 @@ namespace Net
                 co_return;
             }
 
-            OnScoketAccepted(std::move(socket), &_logicIoCtx);
+            auto pSession = CreateSession(std::move(socket));
+            AddNewSession(pSession);
+            OnSessionCreated(pSession);
+            pSession->StartSession();
         }
     }
 
@@ -129,5 +139,11 @@ namespace Net
     {
         std::lock_guard lock(_mutex);
         _sessions.emplace_back(pNewSession);
+    }
+
+    void IServer::RemoveSession(std::shared_ptr<ISession> pSession)
+    {
+        std::lock_guard lock(_mutex);
+        _sessions.erase(std::remove(_sessions.begin(), _sessions.end(), pSession), _sessions.end());
     }
 } // namespace Net
