@@ -9,7 +9,6 @@
 #pragma once
 
 #include "Platform.h"
-#include "Log.h"
 
 #include <filesystem>
 

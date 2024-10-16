@@ -5,6 +5,7 @@ target("Common")
     set_kind("static")
     add_headerfiles("**.h")
     add_files("**.cpp", "**.c", "Net/Proto/*.proto")
+    add_files("**.ixx", {public=true})
 
     add_rules("CommonRule", "protobuf.cpp")
     add_deps("asio", "magic_enum")

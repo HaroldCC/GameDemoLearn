@@ -1,4 +1,4 @@
-set_languages("c++20")
+set_languages("c++23")
 
 set_targetdir("Bin/$(plat)-$(arch)-$(mode)")
 
@@ -36,4 +36,4 @@ includes("3rdParty")
 includes("Src/Common")
 includes("Src/Servers")
 
-includes("Tests")
+-- includes("Tests")

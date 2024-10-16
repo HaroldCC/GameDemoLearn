@@ -6,9 +6,11 @@
 > Github          : www.github.com/Haroldcc
 > Created Time    : 2024年10月14日  18时00分01秒
 ************************************************************************/
-#pragma once
+// #pragma once
 
-#include "Common/Net/Session.h"
+export module LoginSession;
+
+import Common;
 
 class LoginSession final : public Net::ISession
 {
@@ -16,3 +18,9 @@ public:
 protected:
     void OnMessageReceived(Net::MessageBuffer &buffer) override;
 };
+
+module :private;
+
+void LoginSession::OnMessageReceived(Net::MessageBuffer &buffer)
+{
+}
