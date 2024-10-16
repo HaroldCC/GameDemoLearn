@@ -24,7 +24,7 @@ protected:
 private:
 };
 
-module :private;
+// module :private;
 
 LoginServer::LoginServer(std::string_view ip, uint16_t port) : Net::IServer(ip, port)
 {

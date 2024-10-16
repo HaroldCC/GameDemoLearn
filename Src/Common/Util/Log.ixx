@@ -307,7 +307,7 @@ export namespace Log
 
 } // namespace Log
 
-module :private;
+// module :private;
 
 void Log::CLogger::InitLogger(std::string_view fileName,
                               size_t           level,

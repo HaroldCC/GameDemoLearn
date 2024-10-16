@@ -40,7 +40,7 @@ namespace Http
     };
 } // namespace Http
 
-module :private;
+// module :private;
 
 using namespace Http;
 

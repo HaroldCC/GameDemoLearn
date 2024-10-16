@@ -11,8 +11,11 @@ module;
 #include <string_view>
 #include <array>
 #include <unordered_map>
+#include "picohttpparser.h"
 
 export module Common:Net.HttpParser;
+import :Log;
+import :Util;
 
 export namespace Http
 {
@@ -53,10 +56,11 @@ export namespace Http
     };
 } // namespace Http
 
-module :private;
+// module :private;
 
 using namespace Http;
 
+using namespace std::string_literals;
 size_t HttpParser::ParseRequest(std::string_view originalUrl)
 {
     if (originalUrl.empty())
@@ -102,7 +106,7 @@ size_t HttpParser::ParseRequest(std::string_view originalUrl)
         _headers[i] = toHttpHeader(headers[i]);
     }
 
-    std::string_view contentLen = GetHeaderValue(("content-length"sv));
+    std::string_view contentLen = GetHeaderValue(("content-length"));
     _bodyLen                    = Util::StringTo<int>(contentLen).value_or(0);
 
     size_t pos = _path.find('?');
@@ -137,7 +141,7 @@ size_t HttpParser::ParseResponse(std::string_view originalUrl)
                                     &_numHeaders,
                                     0);
     _msg                        = {msg, msgLen};
-    std::string_view contentLen = GetHeaderValue("content-length"sv);
+    std::string_view contentLen = GetHeaderValue("content-length");
     _bodyLen                    = Util::StringTo<int>(contentLen).value_or(0);
     if (_headerLen < 0)
     {

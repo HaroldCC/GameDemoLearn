@@ -30,7 +30,7 @@ export namespace Http
     HttpMethod                 StringToHttpMethod(std::string_view mtd);
 } // namespace Http
 
-module :private;
+// module :private;
 
 using namespace Http;
 

@@ -80,6 +80,11 @@ export namespace TimeUtil
 
     inline std::string GetGMTTimeStr()
     {
-        return std::format("{:%a, %d %b %Y %H:%M:%OS GMT}", std::chrono::system_clock::now());
+        return {};
+        //auto    now  = std::chrono::system_clock::now();
+        //auto    time = std::chrono::system_clock::to_time_t(now);
+        //std::tm tm_gmt {};
+        //gmtime_s(&tm_gmt, &time);
+        //return std::format("{:%a, %d %b %Y %H:%M:%S GMT}", tm_gmt);
     }
 } // namespace TimeUtil

@@ -8,11 +8,16 @@
 ************************************************************************/
 module;
 #include <atomic>
+#include <memory>
+#include <string>
+#include <coroutine>
 
 export module Common:Net.Session;
 
 import Asio;
-import Common:Log;
+import :Log;
+import :Net.Buffer;
+import :ProducerConsumerQueue;
 
 export namespace Net
 {
@@ -24,7 +29,7 @@ export namespace Net
         ISession &operator=(const ISession &) = delete;
         ISession &operator=(ISession &&)      = delete;
 
-        explicit ISession(asio::ip::tcp::socket &&socket);
+        explicit ISession(Asio::socket &&socket);
         virtual ~ISession();
 
         void StartSession();
@@ -67,6 +72,7 @@ export namespace Net
         uint16_t                             _remotePort;
         ProducerConsumerQueue<MessageBuffer> _readBufferQueue;
         ProducerConsumerQueue<MessageBuffer> _writeBufferQueue;
+
 
         std::atomic_bool _closed;
         std::atomic_bool _closing;
@@ -151,7 +157,7 @@ export namespace Net
             Log::Debug("after readLoop:{}", length);
             if (errcode)
             {
-                if (errcode != Asio::error::eof)
+                if (errcode != Asio::misc_errors::eof)
                 {
                     Log::Error("读取消息出错：{}", errcode.message());
                 }
@@ -175,7 +181,7 @@ export namespace Net
             if (!_writeBufferQueue.Pop(packet))
             {
                 std::error_code errcode;
-                co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, errcode));
+                co_await _timer.async_wait(Asio::redirect_error(Asio::use_awaitable, errcode));
                 // _timer.expires_at((std::chrono::steady_clock::time_point::max)());
                 // std::error_code errcode;
                 // co_await _timer.async_wait(asio::redirect_error(asio::use_awaitable, errcode));
@@ -191,7 +197,7 @@ export namespace Net
             }
 
             auto [errcode, length] =
-                co_await asio::async_write(_socket,
+                co_await Asio::async_write(_socket,
                                            Asio::buffer(packet.GetReadPointer(), packet.ReadableBytes()));
             if (errcode)
             {

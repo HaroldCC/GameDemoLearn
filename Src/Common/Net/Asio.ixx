@@ -32,4 +32,11 @@ export namespace Asio
     {
         return asio::ip::make_address(str);
     }
+
+    using asio::awaitable;
+    using asio::detached;
+    using asio::error::misc_errors;
+    using asio::buffer;
+    using asio::redirect_error;
+    using asio::async_write;
 } // namespace Asio

@@ -12,10 +12,14 @@ module;
 #include <vector>
 #include <string_view>
 #include <string>
+#include <format>
 
 export module Common:Net.HttpResponse;
 
 import :Net.HttpCommon;
+import :Net.HttpUtil;
+import :Util;
+import :TimeUtil;
 
 export namespace Http
 {
@@ -52,7 +56,7 @@ export namespace Http
     };
 } // namespace Http
 
-module :private;
+// module :private;
 
 using namespace Http;
 
@@ -64,7 +68,7 @@ using namespace Http;
 [[nodiscard]] std::string_view HttpResponse::GetPayload()
 {
     BuildResponseHead();
-    _head.append(std::format("{}\r\n{}", ContentTypeString(_contentType, _charset), _content));
+    _head.append(std::format("{}\r\n{}", Http::ContentTypeString(_contentType, _charset), _content));
     return _head;
 }
 

@@ -19,7 +19,7 @@ protected:
     void OnMessageReceived(Net::MessageBuffer &buffer) override;
 };
 
-module :private;
+// module :private;
 
 void LoginSession::OnMessageReceived(Net::MessageBuffer &buffer)
 {
